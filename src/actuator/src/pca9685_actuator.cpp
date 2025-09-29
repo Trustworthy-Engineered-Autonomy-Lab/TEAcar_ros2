@@ -27,13 +27,23 @@ public:
         error_ = "Failed to get I2C access for: " + device_name;
         return false;
       }
+      reset();
+
       return setPWMFreq(freq);
     }
 
     void Close()
     {
-      if (fd_ >= 0) close(fd_);
-      fd_ = -1;
+      if (fd_ >= 0) 
+      {
+        uint8_t value = 0;
+        
+        readReg(MODE1, &value);
+        writeReg(MODE1, value | 0x10);
+
+        close(fd_);
+        fd_ = -1;
+      }
     }
 
     bool setPWMFreq(int freq)
@@ -45,7 +55,9 @@ public:
       if (!readReg(MODE1, &oldmode)) return false;
       uint8_t newmode = (oldmode & 0x7F) | 0x10;
       if (!writeReg(MODE1, newmode)) return false;
+
       if (!writeReg(PRESCALE, prescale)) return false;
+
       if (!writeReg(MODE1, oldmode)) return false;
       usleep(5000);
       return writeReg(MODE1, oldmode | 0x80);
@@ -68,6 +80,13 @@ private:
     static constexpr uint8_t MODE1 = 0x00, PRESCALE = 0xFE;
     static constexpr uint8_t LED0_ON_L = 0x06, LED0_ON_H = 0x07;
     static constexpr uint8_t LED0_OFF_L = 0x08, LED0_OFF_H = 0x09;
+    static constexpr uint8_t ALL_LED_OFF_H = 0xFD;
+
+    bool reset()
+    {
+      uint8_t buf[2] = {0x00, 0x06};
+      return write(fd_, buf, 2) == 2;
+    }
 
     bool writeReg(uint8_t reg, uint8_t val)
     {
@@ -134,14 +153,14 @@ protected:
         float steer_duty = steer_pw / cycle;
         float throttle_duty = throttle_pw / cycle;
 
-        RCLCPP_INFO(this->get_logger(), "Calculated PWM -> Throttle: %.2f%%, Steer: %.2f%%", throttle_duty * 100, steer_duty * 100);
+        RCLCPP_DEBUG(this->get_logger(), "Calculated PWM -> Throttle: %.2f%%, Steer: %.2f%%", throttle_duty * 100, steer_duty * 100);
 
         if (!pca_->setPWMChannel(throttle_ch_, throttle_duty)) {
         RCLCPP_ERROR(this->get_logger(), "Failed to write throttle PWM: %s", pca_->getError().c_str());
         }
         else
         {
-          RCLCPP_INFO(this->get_logger(), "✅ Throttle PWM successfully written: duty = %.3f", throttle_duty);
+          RCLCPP_DEBUG(this->get_logger(), "✅ Throttle PWM successfully written: duty = %.3f", throttle_duty);
         }
 
         if (!pca_->setPWMChannel(steer_ch_, steer_duty)) {
@@ -149,7 +168,7 @@ protected:
         }
         else
         {
-          RCLCPP_INFO(this->get_logger(), "✅ Steer PWM successfully written: duty = %.3f", steer_duty);
+          RCLCPP_DEBUG(this->get_logger(), "✅ Steer PWM successfully written: duty = %.3f", steer_duty);
         }
     }
 
