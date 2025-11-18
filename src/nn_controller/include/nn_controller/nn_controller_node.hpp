@@ -8,7 +8,7 @@
 #include "sensor_msgs/image_encodings.hpp"
 #include "cv_bridge/cv_bridge.h"
 #include <opencv2/opencv.hpp>
-#include "donkeycar_msgs/msg/motion_cmd.hpp"
+#include "interfaces_msg/msg/motion_cmd.hpp"
 #include "nn_controller/inferencer_api.hpp"
 
 namespace nnc {
@@ -18,7 +18,7 @@ public:
 private:
   // ROS
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
-  rclcpp::Publisher<donkeycar_msgs::msg::MotionCmd>::SharedPtr cmd_pub_;
+  rclcpp::Publisher<interfaces_msg::msg::MotionCmd>::SharedPtr cmd_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Clock clock_{RCL_ROS_TIME};
 
@@ -50,6 +50,6 @@ private:
   void tick();
   void resizeTimer();
   bool ensureBackendReadyOnce();
-  donkeycar_msgs::msg::MotionCmd makeCmd(float throttle, float steer);
+  interfaces_msg::msg::MotionCmd makeCmd(float throttle, float steer);
 };
 } // namespace nnc

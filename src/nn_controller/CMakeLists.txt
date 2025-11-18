@@ -10,7 +10,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(donkeycar_msgs REQUIRED)
+find_package(interfaces_msg REQUIRED)
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -24,7 +24,7 @@ add_library(nn_controller_lib SHARED
   src/nn_controller_node.cpp
 )
 ament_target_dependencies(nn_controller_lib
-  rclcpp sensor_msgs std_msgs cv_bridge donkeycar_msgs
+  rclcpp sensor_msgs std_msgs cv_bridge interfaces_msg
 )
 target_include_directories(nn_controller_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -34,13 +34,13 @@ target_link_libraries(nn_controller_lib ${OpenCV_LIBS})
 
 # ---- Executable ----
 add_executable(nn_controller_node
-  src/nn_controller_main.cpp
+  src/nn_controller_node.cpp
 )
 target_link_libraries(nn_controller_node
   nn_controller_lib
   tensorflow_inferencer
 )
-ament_target_dependencies(nn_controller_node rclcpp)
+ament_target_dependencies(nn_controller_node rclcpp interfaces_msg)
 
 # ---- Install ----
 install(TARGETS
@@ -63,5 +63,5 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
 endif()
 
 ament_export_include_directories(include)
-ament_export_dependencies(rclcpp sensor_msgs std_msgs cv_bridge OpenCV donkeycar_msgs)
+ament_export_dependencies(rclcpp sensor_msgs std_msgs cv_bridge interfaces_msg)
 ament_package()

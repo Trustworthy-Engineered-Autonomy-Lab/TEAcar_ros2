@@ -1,3 +1,4 @@
+#include "interfaces_msg/msg/motion_cmd.hpp"
 #include "nn_controller/nn_controller_node.hpp"
 #include <algorithm>
 
@@ -25,7 +26,7 @@ NNControllerNode::NNControllerNode(const rclcpp::NodeOptions& opts)
 
   image_sub_ = create_subscription<sensor_msgs::msg::Image>(
     image_topic_, rclcpp::SensorDataQoS(), std::bind(&NNControllerNode::imageCb, this, _1));
-  cmd_pub_ = create_publisher<donkeycar_msgs::msg::MotionCmd>("/motion_cmd", 10);
+  cmd_pub_ = create_publisher<interfaces_msg::msg::MotionCmd>("/motion_cmd", 10);
   resizeTimer();
 
   RCLCPP_INFO(get_logger(), "nn_controller_node up. backend=%s, image_topic=%s",
@@ -74,8 +75,8 @@ bool NNControllerNode::ensureBackendReadyOnce() {
   return true;
 }
 
-donkeycar_msgs::msg::MotionCmd NNControllerNode::makeCmd(float throttle, float steer) {
-  donkeycar_msgs::msg::MotionCmd cmd;
+interfaces_msg::msg::MotionCmd NNControllerNode::makeCmd(float throttle, float steer) {
+  interfaces_msg::msg::MotionCmd cmd;
   cmd.header.stamp = clock_.now();
   cmd.header.frame_id = get_fully_qualified_name();
   cmd.throttle = static_cast<float>(throttle_ratio_ * throttle);
@@ -129,3 +130,12 @@ void NNControllerNode::tick() {
 }
 
 } // namespace nnc
+
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<nnc::NNControllerNode>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
+}
