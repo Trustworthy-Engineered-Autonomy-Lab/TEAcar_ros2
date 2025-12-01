@@ -13,6 +13,10 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(interfaces_msg REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(donkeycar_msgs REQUIRED)
+find_package(inferencer REQUIRED)
 
 # Include directories
 include_directories(
@@ -43,6 +47,20 @@ target_include_directories(param_controller PUBLIC
 )
 
 
+# -------------------------------
+# NN controller node executable (moved from nn_controller package)
+add_executable(nn_controller_node src/nn_controller_node.cpp)
+ament_target_dependencies(nn_controller_node
+  rclcpp std_msgs sensor_msgs inferencer interfaces_msg cv_bridge donkeycar_msgs)
+
+target_link_libraries(nn_controller_node ${OpenCV_LIBRARIES})
+
+target_include_directories(nn_controller_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+# target_link_libraries(nn_controller_node tensorflow_inferencer)
 
 ament_export_dependencies(rosidl_default_runtime)
 ament_export_dependencies(interfaces_msg)
@@ -50,6 +68,7 @@ ament_export_dependencies(interfaces_msg)
 install(TARGETS
   joystick_controller
   param_controller
+  nn_controller_node
   DESTINATION lib/${PROJECT_NAME})
 # uncomment the following section in order to fill in
 # further dependencies manually.

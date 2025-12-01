@@ -18,7 +18,8 @@
   <build_depend>sensor_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>interfaces_msg</build_depend>
-
+  <build_depend>inferencer</build_depend>
+  <build_depend>donkeycar_msgs</build_depend>
 
     <!-- Execution dependencies -->
   <exec_depend>rclcpp</exec_depend>

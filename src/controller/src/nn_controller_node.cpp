@@ -1,5 +1,6 @@
-#include "nn_controller/nn_controller_node.hpp"
+#include "controller/nn_controller_node.hpp"
 #include <algorithm>
+#include "rclcpp/rclcpp.hpp"
 
 // Factory from the linked mock plugin
 extern "C" std::shared_ptr<nnc::Inferencer> tensorflow_inferencer();
@@ -129,3 +130,12 @@ void NNControllerNode::tick() {
 }
 
 } // namespace nnc
+
+int main(int argc, char * argv[])
+{
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<nnc::NNControllerNode>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
+}
