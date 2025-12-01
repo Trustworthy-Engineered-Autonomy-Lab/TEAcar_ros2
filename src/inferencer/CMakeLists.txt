@@ -6,9 +6,9 @@ if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
 endif()
 
-# Default to C++14
+# Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -31,5 +31,58 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+# TensorFlow inferencer library
+add_library(tensorflow_inferencer SHARED
+  src/tensorflow_inferencer.cpp
+)
+
+target_include_directories(tensorflow_inferencer
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+install(
+  TARGETS tensorflow_inferencer
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+ament_export_libraries(tensorflow_inferencer)
+
+# TensorRT inferencer library
+if(EXISTS "/usr/local/cuda/include/cuda_runtime_api.h")
+  message(STATUS "Building TensorRT inferencer with CUDA headers")
+
+  add_library(tensorrt_inferencer SHARED
+    src/tensorrt_inferencer.cpp
+  )
+
+  target_include_directories(tensorrt_inferencer
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>
+    PRIVATE
+      /usr/local/cuda/include
+  )
+
+  install(
+    TARGETS tensorrt_inferencer
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+  )
+else()
+  message(WARNING "CUDA not found; tensorrt_inferencer will NOT be built on this machine")
+endif()
+
+
+# Install public headers
+install(DIRECTORY include/ DESTINATION include)
+
+# Let downstream packages include our headers (e.g. #include "inferencer/inferencer_api.hpp")
+ament_export_include_directories(include)
 
 ament_package()

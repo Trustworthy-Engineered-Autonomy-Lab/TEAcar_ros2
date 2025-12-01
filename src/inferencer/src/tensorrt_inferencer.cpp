@@ -1,5 +1,7 @@
 // inferencer.cpp (TensorRT backend, ROS 2 compatible, no ROS logging)
 
+#include "inferencer/inferencer_c.h"
+
 #include <cuda_runtime_api.h>
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
@@ -86,14 +88,6 @@ std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter> loadOnnx(RTInferencer* in
       }
 
     bool saveEngine(RTInferencer* infer, const std::string& path) {
-    auto ser = std::unique_ptr<nvinfer1::IHostMemory, NvInferDeleter>{infer->engine->serialize()};
-    std::ofstream f(path, std::ios::binary);
-    if (!f) return false;
-    f.write(static_cast<const char*>(ser->data()), ser->size());
-    return true;
-    }
-
-    bool saveEngine(RTInferencer* infer, const std::string& path) {
         auto ser = std::unique_ptr<nvinfer1::IHostMemory, NvInferDeleter>{infer->engine->serialize()};
         std::ofstream f(path, std::ios::binary);
         if (!f) return false;
@@ -123,6 +117,7 @@ std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter> loadOnnx(RTInferencer* in
         if (!inf->buffers[idx]) cudaMallocManaged(&inf->buffers[idx], sz);
         return inf->buffers[idx];
       }
+} //end anonymous namespace
 
     extern "C" void* createInferencer(void*) {
     return new RTInferencer();
@@ -190,10 +185,4 @@ std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter> loadOnnx(RTInferencer* in
     extern "C" const char* getErrorString(void* h) {
     return static_cast<RTInferencer*>(h)->errorString.c_str();
     }
-      
 
-
-      
-
-
-}
