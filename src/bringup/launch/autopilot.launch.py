@@ -20,9 +20,9 @@ def generate_launch_description():
         )
     )
 
-    # Parameters for nn_controller (from nn_controller/config/nn_controller.yaml)
+    # Parameters for nn_controller (new stored in bringup/config/nn_controller.yaml)
     nn_controller_config = os.path.join(
-        get_package_share_directory('nn_controller'),
+        get_package_share_directory('bringup'),
         'config',
         'nn_controller.yaml',
     )
