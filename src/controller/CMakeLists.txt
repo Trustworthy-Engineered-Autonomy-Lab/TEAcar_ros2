@@ -13,10 +13,13 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(interfaces_msg REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(cv_bridge REQUIRED)
+
 
 # Include directories
 include_directories(
   include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../inferencer/include
 )
 
 # -------------------------------
@@ -43,6 +46,21 @@ target_include_directories(param_controller PUBLIC
 )
 
 
+# -------------------------------
+# NN controller node executable
+add_executable(nn_controller_node 
+  src/nn_controller_node.cpp
+  ../inferencer/src/tensorflow_inferencer.cpp
+)
+ament_target_dependencies(nn_controller_node
+  rclcpp sensor_msgs std_msgs interfaces_msg cv_bridge)
+
+target_include_directories(nn_controller_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+
 
 ament_export_dependencies(rosidl_default_runtime)
 ament_export_dependencies(interfaces_msg)
@@ -50,6 +68,7 @@ ament_export_dependencies(interfaces_msg)
 install(TARGETS
   joystick_controller
   param_controller
+  nn_controller_node
   DESTINATION lib/${PROJECT_NAME})
 # uncomment the following section in order to fill in
 # further dependencies manually.

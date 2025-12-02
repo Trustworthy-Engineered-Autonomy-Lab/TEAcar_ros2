@@ -2,7 +2,7 @@
 #include <cmath>
 #include <vector>
 #include <memory>
-#include "nn_controller/inferencer_api.hpp"
+#include "inferencer/inferencer_api.hpp"
 
 namespace { constexpr int W=224, H=144, C=3; }
 

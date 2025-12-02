@@ -2,7 +2,7 @@
 #define CONTROLLER__CONTROLLER_HPP_
 
 #include "rclcpp/rclcpp.hpp"
-#include "interfaces_msg/msg/motioncmd.hpp"
+#include "interfaces_msg/msg/motion_cmd.hpp"
 #include <cmath>
 #include <string>
 
@@ -13,7 +13,7 @@ namespace controller
     public:
     Controller(const std::string & node_name): rclcpp::Node(node_name)
     {
-        publisher_ = this->create_publisher<interfaces_msg::msg::Motioncmd>("/motion_cmd", 10);
+        publisher_ = this->create_publisher<interfaces_msg::msg::MotionCmd>("/motion_cmd", 10);
         this->declare_parameter<double>("Throttle_ratio",1.0);
         this->declare_parameter<double>("steer_ratio",1.0);
 
@@ -35,7 +35,7 @@ namespace controller
     
     void control(float throttle, float steer)
     {
-        auto msg = interfaces_msg::msg::Motioncmd();
+        auto msg = interfaces_msg::msg::MotionCmd();
         msg.header.stamp = this->get_clock()->now();
         msg.header.frame_id = this->get_name();
 
@@ -61,7 +61,7 @@ namespace controller
     float throttle_ratio_;
     float steer_ratio_;
 
-    rclcpp::Publisher<interfaces_msg::msg::Motioncmd>::SharedPtr publisher_;
+    rclcpp::Publisher<interfaces_msg::msg::MotionCmd>::SharedPtr publisher_;
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handle_;
     rcl_interfaces::msg::SetParametersResult parameterCallback(const std::vector<rclcpp::Parameter> & parameters)
     {

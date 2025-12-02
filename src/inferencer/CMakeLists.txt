@@ -17,6 +17,11 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+
+# Make headers in include/ available
+include_directories(
+  include
+)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -31,5 +36,13 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+# Export our public include directory to other packages
+ament_export_include_directories(include)
+
+# Install headers so they end up in install/include/inferencer/...
+install(DIRECTORY include/
+  DESTINATION include
+)
 
 ament_package()

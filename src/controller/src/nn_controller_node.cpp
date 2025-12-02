@@ -1,5 +1,5 @@
 #include "interfaces_msg/msg/motion_cmd.hpp"
-#include "nn_controller/nn_controller_node.hpp"
+#include "controller/nn_controller_node.hpp"
 #include <algorithm>
 
 // Factory from the linked mock plugin

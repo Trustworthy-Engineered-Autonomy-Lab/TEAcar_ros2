@@ -9,7 +9,7 @@
 #include "cv_bridge/cv_bridge.h"
 #include <opencv2/opencv.hpp>
 #include "interfaces_msg/msg/motion_cmd.hpp"
-#include "nn_controller/inferencer_api.hpp"
+#include "inferencer/inferencer_api.hpp"
 
 namespace nnc {
 class NNControllerNode : public rclcpp::Node {
