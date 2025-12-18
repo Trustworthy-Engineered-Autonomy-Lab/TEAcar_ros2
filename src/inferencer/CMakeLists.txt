@@ -1,48 +1,70 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(inferencer)
 
-# Default to C99
-if(NOT CMAKE_C_STANDARD)
-  set(CMAKE_C_STANDARD 99)
-endif()
-
-# Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
-# Make headers in include/ available
-include_directories(
-  include
+include_directories(include)
+
+# Always build mock plugin
+add_library(mock_inferencer SHARED
+  src/mock_inferencer.cpp
 )
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+target_include_directories(mock_inferencer PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(mock_inferencer ament_index_cpp)
+target_link_libraries(mock_inferencer dl)
+set_target_properties(mock_inferencer PROPERTIES OUTPUT_NAME "mock_inferencer")
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # uncomment the line when a copyright and license is not present in all source files
-  #set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # uncomment the line when this package is not in a git repo
-  #set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+# Optional TensorRT plugin
+find_library(NVINFER_LIB nvinfer)
+find_library(NVONNXPARSER_LIB nvonnxparser)
+find_library(CUDART_LIB cudart)
+
+if(NVINFER_LIB AND NVONNXPARSER_LIB AND CUDART_LIB)
+  add_library(tensorrt_inferencer SHARED
+    src/tensorrt_inferencer.cpp
+  )
+  target_include_directories(tensorrt_inferencer PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_link_libraries(tensorrt_inferencer
+    ${NVINFER_LIB}
+    ${NVONNXPARSER_LIB}
+    ${CUDART_LIB}
+    dl
+  )
+  set_target_properties(tensorrt_inferencer PROPERTIES OUTPUT_NAME "tensorrt_inferencer")
+else()
+  message(WARNING "TensorRT backend disabled (missing libs: nvinfer/nvonnxparser/cudart). This is OK on non-Jetson machines.")
 endif()
 
-# Export our public include directory to other packages
-ament_export_include_directories(include)
+install(TARGETS
+  mock_inferencer
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
-# Install headers so they end up in install/include/inferencer/...
+if(TARGET tensorrt_inferencer)
+  install(TARGETS tensorrt_inferencer
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION lib/${PROJECT_NAME}
+  )
+endif()
+
 install(DIRECTORY include/
   DESTINATION include
 )
 
+ament_export_include_directories(include)
+ament_export_dependencies(ament_index_cpp)
 ament_package()

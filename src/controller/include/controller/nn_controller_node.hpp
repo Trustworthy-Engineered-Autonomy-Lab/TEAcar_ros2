@@ -10,6 +10,8 @@
 #include <opencv2/opencv.hpp>
 #include "interfaces_msg/msg/motion_cmd.hpp"
 #include "inferencer/inferencer_api.hpp"
+#include "inferencer/dynamic_inferencer.hpp"
+
 
 namespace nnc {
 class NNControllerNode : public rclcpp::Node {
@@ -27,7 +29,7 @@ private:
   double throttle_ratio_  = 1.0;
   double steer_ratio_     = 1.0;
   std::string image_topic_ = "/camera/image_raw";
-  std::string backend_     = "tensorflow";
+  std::string backend_     = "mock";
   std::string model_file_  = "/tmp/dummy.onnx";
   std::string input_name_  = "input";
   std::string output_name_ = "outputs";
@@ -38,7 +40,7 @@ private:
   cv::Rect roi_;
 
   // Inference
-  InferencerPtr inferencer_;
+  nnc::InferencerPtr inferencer_;
   bool   backend_ready_ = false;
   void*  input_buffer_  = nullptr;
   void*  output_buffer_ = nullptr;

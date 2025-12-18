@@ -2,9 +2,6 @@
 #include "controller/nn_controller_node.hpp"
 #include <algorithm>
 
-// Factory from the linked mock plugin
-extern "C" std::shared_ptr<nnc::Inferencer> tensorflow_inferencer();
-
 using std::placeholders::_1;
 
 namespace nnc {
@@ -51,7 +48,7 @@ void NNControllerNode::imageCb(const sensor_msgs::msg::Image::ConstSharedPtr msg
 bool NNControllerNode::ensureBackendReadyOnce() {
   if (backend_ready_) return true;
 
-  inferencer_ = tensorflow_inferencer();
+  inferencer_ = std::make_shared<nnc::DynamicInferencer>(backend_);
 
   if (!inferencer_->loadModel(model_file_)) {
     RCLCPP_ERROR(get_logger(), "loadModel failed: %s", inferencer_->getErrorString().c_str());
