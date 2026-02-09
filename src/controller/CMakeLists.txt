@@ -42,6 +42,18 @@ target_include_directories(param_controller PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
+# -------------------------------
+# NN controller executable
+add_executable(nn_controller src/nn_controller.cpp)
+ament_target_dependencies(nn_controller
+  rclcpp std_msgs interfaces_msg)
+
+target_include_directories(nn_controller PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+
 
 
 ament_export_dependencies(rosidl_default_runtime)
