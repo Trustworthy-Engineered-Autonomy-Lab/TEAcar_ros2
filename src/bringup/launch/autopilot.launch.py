@@ -1,5 +1,3 @@
-# bringup/launch/autopilot.launch.py
-
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -10,7 +8,10 @@ import os
 
 def generate_launch_description():
     bringup_share = get_package_share_directory('bringup')
-    drive_launch = os.path.join(bringup_share, 'launch', 'drive.launch.py')
+
+    # NOTE: due to CMake install DESTINATION share/${PROJECT_NAME}/launch,
+    # the launch files end up in .../share/bringup/launch/launch/
+    drive_launch = os.path.join(bringup_share, 'launch', 'launch', 'drive.launch.py')
 
     return LaunchDescription([
         IncludeLaunchDescription(
@@ -25,7 +26,7 @@ def generate_launch_description():
                 "! nvvidconv flip-method=2 "
                 "! video/x-raw, width=224, height=224, format=BGRx "
                 "! videocrop left=0 right=0 top=80 bottom=0 "
-                "! videoconvert"
+                "! videoconvert "
             ),
         ),
 
@@ -44,11 +45,7 @@ def generate_launch_description():
             parameters=[
                 {"steer_ratio": -1.0},
                 {"backend": "tensorrt"},
-                {"model_file": os.path.join(
-                    get_package_share_directory('bringup'),
-                    "models",
-                    "best.onnx",
-                )},
+                {"model_file": os.path.join(bringup_share, "models", "best.onnx")},
                 {"input_name": "image"},
                 {"output_name": "steer"},
             ],
