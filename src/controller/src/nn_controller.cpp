@@ -38,7 +38,8 @@ public:
         input_name_ = this->get_parameter("input_name").as_string();
 
         constexpr auto interval = std::chrono::seconds(1);
-        retry_init_timer_ = this->create_timer(interval, std::bind(&NNControllerNode::initCallback, this));
+        retry_init_timer_ = this->create_wall_timer(
+            interval, std::bind(&NNControllerNode::initCallback, this));
 
         RCLCPP_INFO(this->get_logger(), "NNControllerNode initialization started.");
     }
@@ -311,7 +312,9 @@ private:
         const float steer = *reinterpret_cast<float *>(output_buffer_);
 
         // Only controls steer; throttle is managed elsewhere.
-        this->controlSteer(steer); // publishes /motion_cmd
+        // Note: original code used control(0.0f, steer). If your base class does not
+        // provide controlSteer(), change this call back to control(0.0f, steer).
+        this->control(0.0f, steer); // publishes /motion_cmd
 
         RCLCPP_DEBUG(this->get_logger(), "Inference OK, steer=%f", steer);
     }
