@@ -13,7 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(interfaces_msg REQUIRED)  # Your custom message package
+find_package(teacar_msgs REQUIRED)  # Your custom message package
 
 
 include_directories(
@@ -29,7 +29,7 @@ ament_target_dependencies(pca9685_actuator
   rcl_interfaces
   std_msgs
   sensor_msgs
-  interfaces_msg
+  teacar_msgs
 )
 
 # Install
