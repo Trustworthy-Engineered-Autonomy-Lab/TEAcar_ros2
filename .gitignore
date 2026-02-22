@@ -2,3 +2,4 @@
 /install/
 .vscode
 /log/
+*.code-workspace

@@ -9,9 +9,7 @@ import os
 def generate_launch_description():
     bringup_share = get_package_share_directory('bringup')
 
-    # NOTE: due to CMake install DESTINATION share/${PROJECT_NAME}/launch,
-    # the launch files end up in .../share/bringup/launch/launch/
-    drive_launch = os.path.join(bringup_share, 'launch', 'launch', 'drive.launch.py')
+    drive_launch = os.path.join(bringup_share, 'launch', 'drive.launch.py')
 
     return LaunchDescription([
         IncludeLaunchDescription(
@@ -45,7 +43,8 @@ def generate_launch_description():
             parameters=[
                 {"steer_ratio": -1.0},
                 {"backend": "tensorrt"},
-                {"model_file": os.path.join(bringup_share, "models", "best.onnx")},
+                # DUMMY: Replace with real model path before publication
+                {"model_file": os.path.join(bringup_share, "models", "dummy_model.onnx")},
                 {"input_name": "image"},
                 {"output_name": "steer"},
             ],

@@ -26,7 +26,13 @@ endif()
 #Install launch files
 install(
   DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# DUMMY: Install dummy model for testing — remove before publication
+install(
+  DIRECTORY models
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()

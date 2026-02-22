@@ -52,7 +52,13 @@ namespace inferencer
             if (handle_) delete_inferencer_(handle_);
             if (dll_handle_) dlclose(dll_handle_);
         }
-    
+
+        bool load_model(const char *path) { return load_model_(path); }
+        size_t get_input_buffer(const char *name, void **buf) { return get_input_buffer_(name, buf); }
+        size_t get_output_buffer(const char *name, void **buf) { return get_output_buffer_(name, buf); }
+        bool infer() { return infer_(); }
+        const char *get_error_string() { return get_error_string_(); }
+
     private:
         using CreateInferencerFunc = void *(*)(void *);
         using DeleteInferencerFunc = void (*)(void *);

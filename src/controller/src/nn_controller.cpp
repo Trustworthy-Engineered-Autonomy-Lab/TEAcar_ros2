@@ -1,12 +1,12 @@
 #include "controller/controller.hpp"
-#include "inferencer/inferencer.hpp"
+#include "inferencer/inferencer.h"
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/image_encodings.hpp"
 #include "sensor_msgs/msg/image.hpp"
 
 #include <chrono>
-#include <cv_bridge/cv_bridge.hpp>
+#include <cv_bridge/cv_bridge.h>
 #include <memory>
 #include <opencv2/opencv.hpp>
 #include <string>
