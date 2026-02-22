@@ -23,25 +23,35 @@ def main():
     # Output: "steer" — float32 [1]
     steer_output = helper.make_tensor_value_info("steer", TensorProto.FLOAT, [1])
 
-    # Constant tensor: always 0.0
-    constant_value = numpy_helper.from_array(
-        np.array([0.0], dtype=np.float32), name="const_steer"
+    # We'll make the ONNX model steer based on the overall brightness of the image.
+    # Bright image -> steer right (+1.0)
+    # Dark image -> steers left (-1.0)
+    # This makes it visibly distinct from the C++ dummy sine wave steering.
+    
+    # 1. ReduceMean over all spatial and channel axes [1, 2, 3]
+    reduce_mean_node = helper.make_node(
+        "ReduceMean",
+        inputs=["image"],
+        outputs=["mean_val"],
+        axes=[1, 2, 3],
+        keepdims=1,
     )
 
-    # A single Constant node that ignores the input and outputs 0.0
-    # We also add an Identity node so the input is "used" (some runtimes
-    # optimise away unused inputs).
-    identity_node = helper.make_node("Identity", inputs=["image"], outputs=["image_identity"])
-    constant_node = helper.make_node(
-        "Constant",
-        inputs=[],
-        outputs=["steer"],
-        value=constant_value,
-    )
+    # 2. Divide by 127.5 (assuming input pixels are in [0, 255.0])
+    div_const = numpy_helper.from_array(np.array([127.5], dtype=np.float32), name="div_const")
+    div_const_node = helper.make_node("Constant", inputs=[], outputs=["div_const_val"], value=div_const)
+    div_node = helper.make_node("Div", inputs=["mean_val", "div_const_val"], outputs=["scaled_val"])
+
+    # 3. Subtract 1.0 to shift to [-1.0, 1.0]
+    sub_const = numpy_helper.from_array(np.array([1.0], dtype=np.float32), name="sub_const")
+    sub_const_node = helper.make_node("Constant", inputs=[], outputs=["sub_const_val"], value=sub_const)
+    
+    # ONNX Sub node
+    sub_node = helper.make_node("Sub", inputs=["scaled_val", "sub_const_val"], outputs=["steer"])
 
     graph = helper.make_graph(
-        [identity_node, constant_node],
-        "dummy_steer_model",
+        [reduce_mean_node, div_const_node, div_node, sub_const_node, sub_node],
+        "dummy_brightness_steer_model",
         [image_input],
         [steer_output],
     )
