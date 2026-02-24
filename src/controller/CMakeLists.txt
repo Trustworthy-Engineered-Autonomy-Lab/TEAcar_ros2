@@ -12,7 +12,7 @@ find_package(rclcpp REQUIRED)
 find_package(inferencer REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(interfaces_msg REQUIRED)
+find_package(teacar_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(cv_bridge REQUIRED)
 
@@ -24,7 +24,7 @@ include_directories(
 # -------------------------------
 # Joystick controller executable
 add_executable(joystick_controller src/joystick_controller.cpp)
-ament_target_dependencies(joystick_controller rclcpp sensor_msgs std_msgs interfaces_msg )
+ament_target_dependencies(joystick_controller rclcpp sensor_msgs std_msgs teacar_msgs)
 
 # Include headers
 target_include_directories(joystick_controller PUBLIC
@@ -37,7 +37,7 @@ target_include_directories(joystick_controller PUBLIC
 # Param controller executable
 add_executable(param_controller src/param_controller.cpp)
 ament_target_dependencies(param_controller
-  rclcpp sensor_msgs std_msgs interfaces_msg)
+  rclcpp std_msgs teacar_msgs)
 
 target_include_directories(param_controller PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -47,7 +47,7 @@ target_include_directories(param_controller PUBLIC
 # -------------------------------
 # NN controller executable
 add_executable(nn_controller src/nn_controller.cpp)
-ament_target_dependencies(nn_controller rclcpp sensor_msgs inferencer std_msgs interfaces_msg cv_bridge)
+ament_target_dependencies(nn_controller rclcpp sensor_msgs inferencer std_msgs teacar_msgs cv_bridge)
 
 target_include_directories(nn_controller PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -58,7 +58,7 @@ target_include_directories(nn_controller PUBLIC
 
 
 ament_export_dependencies(rosidl_default_runtime)
-ament_export_dependencies(interfaces_msg)
+ament_export_dependencies(teacar_msgs)
 
 install(TARGETS
   joystick_controller

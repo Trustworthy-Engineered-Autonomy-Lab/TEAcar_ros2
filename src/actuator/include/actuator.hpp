@@ -3,7 +3,7 @@
 #define ACTUATOR__ACTUATOR_NODE_HPP_
 
 #include "rclcpp/rclcpp.hpp"
-#include "interfaces_msg/msg/motioncmd.hpp"
+#include "teacar_msgs/msg/motioncmd.hpp"
 #include <unordered_map>
 #include <array>
 #include <string>
@@ -27,9 +27,9 @@ public:
         }
 
         // Create publisher and subscriber
-    combined_cmd_pub_ = this->create_publisher<interfaces_msg::msg::Motioncmd>("/combined_motion_cmd", 10);
+    combined_cmd_pub_ = this->create_publisher<teacar_msgs::msg::Motioncmd>("/combined_motion_cmd", 10);
 
-    cmd_sub_ = this->create_subscription<interfaces_msg::msg::Motioncmd>(
+    cmd_sub_ = this->create_subscription<teacar_msgs::msg::Motioncmd>(
         "/motion_cmd", 10,
         std::bind(&Actuator::motion_callback, this, std::placeholders::_1));
 
@@ -49,8 +49,8 @@ virtual void actuate(float throttle, float steer) {}
 
 private:
     int control_frequency_;
-    rclcpp::Publisher<interfaces_msg::msg::Motioncmd>::SharedPtr combined_cmd_pub_;
-    rclcpp::Subscription<interfaces_msg::msg::Motioncmd>::SharedPtr cmd_sub_;
+    rclcpp::Publisher<teacar_msgs::msg::Motioncmd>::SharedPtr combined_cmd_pub_;
+    rclcpp::Subscription<teacar_msgs::msg::Motioncmd>::SharedPtr cmd_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
     std::unordered_map<std::string, std::array<float, 2>> motion_cmds_;
@@ -68,7 +68,7 @@ private:
     combined_throttle = std::max(-1.0f, std::min(1.0f, combined_throttle));
     combined_steer = std::max(-1.0f, std::min(1.0f, combined_steer));
         
-        interfaces_msg::msg::Motioncmd msg;
+        teacar_msgs::msg::Motioncmd msg;
         msg.header.stamp = this->get_clock()->now();
         msg.header.frame_id = "actuator";
         msg.throttle = combined_throttle;
@@ -84,7 +84,7 @@ private:
 
     }
 
-    void motion_callback(const interfaces_msg::msg::Motioncmd::SharedPtr msg)
+    void motion_callback(const teacar_msgs::msg::Motioncmd::SharedPtr msg)
     {
         RCLCPP_DEBUG(this->get_logger(), "Received motion cmd: throttle=%.2f, steer=%.2f from node: %s",
                     msg->throttle, msg->steer, msg->header.frame_id.c_str());
