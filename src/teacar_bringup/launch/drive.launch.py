@@ -50,27 +50,16 @@ def generate_launch_description():
                 {"pwm_frequency": 60},
 
                 # Throttle Configuration
-                {"throttle_pwm_channel": 3},
+                {"throttle_pwm_channel": 0},
                 {"throttle_min_pulsewidth": 1000},
                 {"throttle_max_pulsewidth": 2000},
                 {"throttle_mid_pulsewidth": 1500},
 
                 # Steer Configuration
-                {"steer_pwm_channel": 0},
+                {"steer_pwm_channel": 1},
                 {"steer_min_pulsewidth": 1200},
                 {"steer_max_pulsewidth": 2000},
                 {"steer_mid_pulsewidth": 1600},
             ]
         ),
-
-        # Camera node
-        Node(
-            package="gscam",
-            executable="gscam_node",
-            name="camera",
-            output="screen"
-            # Optional: add parameters or remappings if needed
-            # parameters=[{"camera_info_url": "package://localcam/calibrations/${NAME}.yaml"}],
-            # remappings=[("camera/image_raw", "cam_name/image_raw")]
-        )
     ])

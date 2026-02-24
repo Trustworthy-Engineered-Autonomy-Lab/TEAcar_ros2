@@ -73,7 +73,9 @@ size_t getTypeSize(nvinfer1::DataType type) {
 std::unique_ptr<nvinfer1::ICudaEngine> loadOnnx(RTInferencer* infer, const std::string& file) {
     // TRT 10: createNetworkV2(0) — kEXPLICIT_BATCH is deprecated / default
     auto builder = std::unique_ptr<nvinfer1::IBuilder>{nvinfer1::createInferBuilder(infer->logger)};
-    auto network = std::unique_ptr<nvinfer1::INetworkDefinition>{builder->createNetworkV2(0)};
+    auto network = std::unique_ptr<nvinfer1::INetworkDefinition>{
+        builder->createNetworkV2(1U << (uint32_t)nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH)
+    };
     auto parser  = std::unique_ptr<nvonnxparser::IParser>{nvonnxparser::createParser(*network, infer->logger)};
 
     if (!parser->parseFromFile(file.c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
