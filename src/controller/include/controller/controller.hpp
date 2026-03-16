@@ -14,10 +14,10 @@ namespace controller
     Controller(const std::string & node_name): rclcpp::Node(node_name)
     {
         publisher_ = this->create_publisher<teacar_msgs::msg::Motioncmd>("/motion_cmd", 10);
-        this->declare_parameter<double>("Throttle_ratio",1.0);
+        this->declare_parameter<double>("throttle_ratio",1.0);
         this->declare_parameter<double>("steer_ratio",1.0);
 
-        this->get_parameter("Throttle_ratio",throttle_ratio_);
+        this->get_parameter("throttle_ratio",throttle_ratio_);
         this->get_parameter("steer_ratio", steer_ratio_);
         
         RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
@@ -25,7 +25,7 @@ namespace controller
         RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
         RCLCPP_INFO(this->get_logger(), "%-20s | %-10s", "Parameter", "Value");
         RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
-        RCLCPP_INFO(this->get_logger(), "%-20s | %-10f", "Throttle ratio", throttle_ratio_);
+        RCLCPP_INFO(this->get_logger(), "%-20s | %-10f", "throttle ratio", throttle_ratio_);
         RCLCPP_INFO(this->get_logger(), "%-20s | %-10f", "Steer ratio", steer_ratio_);
         RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
 
@@ -63,6 +63,7 @@ namespace controller
 
     rclcpp::Publisher<teacar_msgs::msg::Motioncmd>::SharedPtr publisher_;
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handle_;
+    
     rcl_interfaces::msg::SetParametersResult parameterCallback(const std::vector<rclcpp::Parameter> & parameters)
     {
         for(const auto & param : parameters)
@@ -70,12 +71,12 @@ namespace controller
             if(param.get_name() == "throttle_ratio")
             {
                 throttle_ratio_ = param.as_double();
-                RCLCPP_DEBUG(this->get_logger(),"Updated throttle_ratio: %f", throttle_ratio_ );
+                RCLCPP_INFO(this->get_logger(),"Updated throttle_ratio: %f", throttle_ratio_ );
             }
             else if( param.get_name() == "steer_ratio")
             {
                 steer_ratio_ = param.as_double();
-                RCLCPP_DEBUG(this->get_logger(), "Updated steer_ratio: %f", steer_ratio_);
+                RCLCPP_INFO(this->get_logger(), "Updated steer_ratio: %f", steer_ratio_);
             }
         }
         rcl_interfaces::msg::SetParametersResult result;
