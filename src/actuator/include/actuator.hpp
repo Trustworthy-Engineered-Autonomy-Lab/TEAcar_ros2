@@ -17,15 +17,12 @@ namespace actuator
     public:
         Actuator() : Node("actuator_node")
         {
+            // Parameter update callback
+            param_callback_handle_ = this->add_on_set_parameters_callback(
+                std::bind(&Actuator::on_parameter_change, this, std::placeholders::_1));
+
             // Declare and get parameter
             this->declare_parameter<int>("control_frequency", 50);
-            this->get_parameter("control_frequency", control_frequency_);
-
-            if (control_frequency_ <= 0)
-            {
-                RCLCPP_WARN(this->get_logger(), "Invalid control_frequency %d, defaulting to 50", control_frequency_);
-                control_frequency_ = 50;
-            }
 
             // Create publisher and subscriber
             combined_cmd_pub_ = this->create_publisher<teacar_msgs::msg::Motioncmd>("/combined_motion_cmd", 10);
@@ -33,28 +30,19 @@ namespace actuator
             cmd_sub_ = this->create_subscription<teacar_msgs::msg::Motioncmd>(
                 "/motion_cmd", 10,
                 std::bind(&Actuator::motion_callback, this, std::placeholders::_1));
-
-            // Create timer
-            timer_ = this->create_wall_timer(
-                std::chrono::duration<double>(1.0 / control_frequency_),
-                std::bind(&Actuator::timer_callback, this));
-
-            // Parameter update callback
-            param_callback_handle_ = this->add_on_set_parameters_callback(
-                std::bind(&Actuator::on_parameter_change, this, std::placeholders::_1));
         }
 
     protected:
         virtual void actuate(float throttle, float steer) {}
 
     private:
-        int control_frequency_;
+        int control_frequency_ = 50;
         rclcpp::Publisher<teacar_msgs::msg::Motioncmd>::SharedPtr combined_cmd_pub_;
         rclcpp::Subscription<teacar_msgs::msg::Motioncmd>::SharedPtr cmd_sub_;
         rclcpp::TimerBase::SharedPtr timer_;
         rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
         std::unordered_map<std::string, std::array<float, 2>> motion_cmds_;
-        
+
         void timer_callback()
         {
             float combined_throttle = 0.0f;
@@ -100,28 +88,43 @@ namespace actuator
             {
                 if (param.get_name() == "control_frequency")
                 {
-                    int new_freq = param.as_int();
-                    if (new_freq > 0)
-                    {
-                        control_frequency_ = new_freq;
-                        timer_->reset();
-                        timer_->cancel();
-                        timer_ = this->create_wall_timer(
-                            std::chrono::duration<double>(1.0 / control_frequency_),
-                            std::bind(&Actuator::timer_callback, this));
-
-                        RCLCPP_INFO(this->get_logger(), "Updated control_frequency to %d Hz", control_frequency_);
-                    }
-                    else
-                    {
-                        RCLCPP_WARN(this->get_logger(), "Attempted to set invalid control_frequency %d", new_freq);
-                    }
+                    set_control_frequency(param.as_int());
                 }
             }
             rcl_interfaces::msg::SetParametersResult result;
             result.successful = true;
             result.reason = "Updated parameters successfully";
             return result;
+        }
+
+        void set_control_frequency(int new_freq)
+        {
+            // Check if the control frequency is valid
+            if (new_freq <= 0)
+            {
+                RCLCPP_WARN(this->get_logger(), "Attempted to set invalid control_frequency %d. Ignored", new_freq);
+                return;
+            }
+
+            // If the frequency is changed, stop and remove the old timer
+            if ((new_freq != control_frequency_) && timer_)
+            {
+                timer_->reset();
+                timer_->cancel();
+                timer_.reset();
+            }
+
+            control_frequency_ = new_freq;
+
+            // Create the timer
+            if (!timer_)
+            {
+                timer_ = this->create_wall_timer(
+                    std::chrono::duration<double>(1.0 / control_frequency_),
+                    std::bind(&Actuator::timer_callback, this));
+            }
+
+            RCLCPP_INFO(this->get_logger(), "Updated control_frequency to %d Hz", control_frequency_);
         }
     };
 }

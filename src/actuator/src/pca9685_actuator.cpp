@@ -35,7 +35,7 @@ public:
       goto clean_up;
 
     return true;
-clean_up:
+  clean_up:
     ::close(fd_);
     fd_ = -1;
     return false;
@@ -250,7 +250,7 @@ private:
         std::string new_bus_device = param.as_string();
         if (new_bus_device != bus_device_)
         {
-          if (!pca_ -> is_opened())
+          if (!pca_->is_opened())
           {
             // If pca9685 is not opened, update the parameter than wait for the monitor to open it.
             bus_device_ = new_bus_device;

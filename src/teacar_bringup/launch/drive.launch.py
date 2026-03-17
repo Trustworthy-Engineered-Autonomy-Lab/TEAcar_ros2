@@ -15,10 +15,13 @@ def generate_launch_description():
 
     # Joystick driver node
     joy_node = Node(
-        package="joy",
-        executable="joy_node",
-        name="joy_node",
-        output="screen"
+        package="joy_linux",
+        executable="joy_linux_node",
+        name="joy_linux_node",
+        output="screen",
+        parameters=[
+            {"dev":"/dev/input/js0"}
+        ]
     )
     
     # Joystick controller node
