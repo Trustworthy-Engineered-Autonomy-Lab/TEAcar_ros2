@@ -1,16 +1,23 @@
 from launch import LaunchDescription
-from launch.actions import SetEnvironmentVariable, DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
 
-    # Set environment variable for camera
-    gscam_env = SetEnvironmentVariable(
-        name="GSCAM_CONFIG",
-        value=("nvarguscamerasrc ! video/x-raw(memory:NVMM), width=1280, height=720, "
-                "format=NV12, framerate=30/1 ! nvvidconv flip-method=2 ! nvvidconv ! "
-                "video/x-raw, width=224, height=224, format=BGRx ! videoconvert")
+    teacar_bringup_pkg = FindPackageShare('teacar_bringup')
+
+    config_file_arg = DeclareLaunchArgument(
+        "config_file",
+        default_value=PathJoinSubstitution([teacar_bringup_pkg, 'config', 'drive_config.yaml'])
+    )
+
+    camera_launch = IncludeLaunchDescription(
+        PathJoinSubstitution([teacar_bringup_pkg, 'launch', 'camera.launch.py']),
+        launch_arguments={
+            "config_file": LaunchConfiguration("config_file")
+        }.items()
     )
 
     # Joystick driver node
@@ -20,7 +27,7 @@ def generate_launch_description():
         name="joy_linux_node",
         output="screen",
         parameters=[
-            {"dev":"/dev/input/js0"}
+            LaunchConfiguration("config_file"),
         ]
     )
     
@@ -31,12 +38,7 @@ def generate_launch_description():
         name="joystick_controller_node",
         output="screen",
         parameters=[
-            # Joystick Ratio Settings
-            {"throttle_ratio": 0.6},
-            {"steer_ratio": -1.0},
-            # Joystick Channel Setting
-            {"throttle_axis": 4},
-            {"steer_axis": 0}
+            LaunchConfiguration("config_file")
         ]
     )
     
@@ -45,7 +47,10 @@ def generate_launch_description():
         package="controller",
         executable="param_controller",
         name="param_controller_node",
-        output="screen"
+        output="screen",
+        parameters=[
+            LaunchConfiguration("config_file")
+        ]
     )
 
     # Actuator node
@@ -55,37 +60,15 @@ def generate_launch_description():
         name="pca9685_actuator_node",
         output="screen",
         parameters=[
-            # PWM Frequency and Bus Configuration
-            {"bus_device": "/dev/i2c-7"},
-            {"pwm_frequency": 60},
-
-            # Throttle Configuration
-            {"throttle_pwm_channel": 0},
-            {"throttle_min_pulsewidth": 1000},
-            {"throttle_max_pulsewidth": 2000},
-            {"throttle_mid_pulsewidth": 1500},
-
-            # Steer Configuration
-            {"steer_pwm_channel": 1},
-            {"steer_min_pulsewidth": 1200},
-            {"steer_max_pulsewidth": 2000},
-            {"steer_mid_pulsewidth": 1600},
+            LaunchConfiguration("config_file"),
         ]
     )
     
-    # Camera node
-    gscam_node = Node(
-        package="gscam",
-        executable="gscam_node",
-        name="camera",
-        output="screen"
-    )
-
     return LaunchDescription([
-        gscam_env,
+        config_file_arg,
+        camera_launch,
         joy_node,
         param_controller_node,
         joystick_controller_node,
-        pca9685_actuator_node,
-        gscam_node
+        pca9685_actuator_node
     ])
