@@ -2,3 +2,8 @@
 /install/
 .vscode
 /log/
+**/config/*
+!**/config/.gitkeep
+**/model/*
+!**/config/.gitkeep
+**/data/*
