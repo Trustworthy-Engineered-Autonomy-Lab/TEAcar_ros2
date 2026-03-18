@@ -19,13 +19,7 @@ include_directories(
 )
 
 # Build executable
-add_executable(pca9685_driver src/pca9685_driver.cpp)
 add_executable(pwm_based_actuator src/pwm_based_actuator.cpp)
-
-ament_target_dependencies(pca9685_driver
-  rclcpp
-  std_msgs
-)
 
 ament_target_dependencies(pwm_based_actuator
   rclcpp
@@ -34,7 +28,7 @@ ament_target_dependencies(pwm_based_actuator
 )
 
 # Install
-install(TARGETS pca9685_driver pwm_based_actuator
+install(TARGETS pwm_based_actuator
   DESTINATION lib/${PROJECT_NAME}
 )
 

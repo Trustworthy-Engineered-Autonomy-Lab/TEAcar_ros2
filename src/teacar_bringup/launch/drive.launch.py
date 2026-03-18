@@ -119,7 +119,7 @@ def generate_launch_description():
 
     # PCA9685 driver
     pca9685_driver_node = Node(
-        package="actuator",
+        package="hardware_drivers",
         executable="pca9685_driver",
         name="pca9685_driver_node",
         output="screen",
