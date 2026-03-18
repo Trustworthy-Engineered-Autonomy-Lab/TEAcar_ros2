@@ -31,33 +31,97 @@ def generate_launch_description():
         ]
     )
     
-    # Joystick controller node
-    joystick_controller_node = Node(
-        package="controller",
-        executable="joystick_controller",
-        name="joystick_controller_node",
+    # Steer controllers
+    steer_controller_nodes = [
+        Node(
+            package="controller",
+            executable="joystick_controller",
+            name="joystick_steer_controller_node",
+            output="screen",
+            parameters=[
+                LaunchConfiguration("config_file")
+            ],
+            remappings=[
+                ("/motion", "/steer")
+            ]
+        ),
+        Node(
+            package="controller",
+            executable="param_controller",
+            name="param_steer_controller_node",
+            output="screen",
+            parameters=[
+                LaunchConfiguration("config_file")
+            ],
+            remappings=[
+                ("/motion", "/steer")
+            ]
+        )
+    ]
+
+    # Throttle controllers
+    throttle_controller_nodes = [
+        Node(
+            package="controller",
+            executable="joystick_controller",
+            name="joystick_throttle_controller_node",
+            output="screen",
+            parameters=[
+                LaunchConfiguration("config_file")
+            ],
+            remappings=[
+                ("/motion", "/throttle")
+            ]
+        ),
+        Node(
+            package="controller",
+            executable="param_controller",
+            name="param_throttle_controller_node",
+            output="screen",
+            parameters=[
+                LaunchConfiguration("config_file")
+            ],
+            remappings=[
+                ("/motion", "/throttle")
+            ]
+        )
+    ]
+
+    # Steer actuator
+    steer_actuator_node = Node(
+        package="actuator",
+        executable="pwm_based_actuator",
+        name="steer_actuator_node",
         output="screen",
         parameters=[
             LaunchConfiguration("config_file")
-        ]
-    )
-    
-    # Parameter controller node
-    param_controller_node = Node(
-        package="controller",
-        executable="param_controller",
-        name="param_controller_node",
-        output="screen",
-        parameters=[
-            LaunchConfiguration("config_file")
+        ],
+        remappings=[
+            ("/motion", "/steer"),
+            ("/combined_motion", "/combined_steer")
         ]
     )
 
-    # Actuator node
-    pca9685_actuator_node = Node(
+    # Throttle actuator
+    throttle_actuator_node = Node(
         package="actuator",
-        executable="pca9685_actuator",
-        name="pca9685_actuator_node",
+        executable="pwm_based_actuator",
+        name="throttle_actuator_node",
+        output="screen",
+        parameters=[
+            LaunchConfiguration("config_file")
+        ],
+        remappings=[
+            ("/motion", "/throttle"),
+            ("/combined_motion", "/combined_throttle")
+        ]
+    )
+
+    # PCA9685 driver
+    pca9685_driver_node = Node(
+        package="actuator",
+        executable="pca9685_driver",
+        name="pca9685_driver_node",
         output="screen",
         parameters=[
             LaunchConfiguration("config_file"),
@@ -68,7 +132,9 @@ def generate_launch_description():
         config_file_arg,
         camera_launch,
         joy_node,
-        param_controller_node,
-        joystick_controller_node,
-        pca9685_actuator_node
+        *steer_controller_nodes,
+        *throttle_controller_nodes,
+        steer_actuator_node,
+        throttle_actuator_node,
+        pca9685_driver_node
     ])

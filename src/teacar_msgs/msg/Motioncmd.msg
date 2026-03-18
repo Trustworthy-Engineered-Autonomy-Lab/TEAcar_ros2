@@ -1,3 +1,3 @@
 std_msgs/Header header
-float32 throttle
-float32 steer
+string source
+float32 value

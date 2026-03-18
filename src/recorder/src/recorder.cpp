@@ -21,22 +21,23 @@ class RecorderNode : public rclcpp::Node
 public:
     RecorderNode() : rclcpp::Node("recorder_node"),
                      image_sub_(dynamic_cast<rclcpp::Node *>(this), "/camera/image_raw"),
-                     motion_cmd_sub_(dynamic_cast<rclcpp::Node *>(this), "/combined_motion_cmd"),
-                     sync_sub_(ApproxSyncPolicy(10), image_sub_, motion_cmd_sub_)
+                     steer_sub_(dynamic_cast<rclcpp::Node *>(this), "/combined_steer"),
+                     throttle_sub_(dynamic_cast<rclcpp::Node *>(this), "/combined_throttle"),
+                     sync_sub_(ApproxSyncPolicy(10), image_sub_, steer_sub_, throttle_sub_)
     {
         param_callback_handle_ = this->add_on_set_parameters_callback(
             std::bind(&RecorderNode::on_parameter_change, this, std::placeholders::_1));
 
         std::filesystem::path default_data_path = std::filesystem::temp_directory_path() / "collect_%Y_%m_%d_%H_%M_%S";
 
-        this->declare_parameter<bool>("enable", false);
-        this->declare_parameter<std::string>("data_folder", default_data_path.string());
-        this->declare_parameter<int>("downsample_rate", 1);
-        this->declare_parameter<int>("record_button", 5);
-        this->declare_parameter<bool>("compress_on_exit", true);
-        this->declare_parameter<std::string>("data_folder_resolved", "");
+        this->declare_parameter("enable", false);
+        this->declare_parameter("data_folder", default_data_path.string());
+        this->declare_parameter("downsample_rate", 1);
+        this->declare_parameter("record_button", 5);
+        this->declare_parameter("compress_on_exit", true);
+        this->declare_parameter("data_folder_resolved", "");
 
-        sync_sub_.registerCallback(std::bind(&RecorderNode::sync_callback, this, std::placeholders::_1, std::placeholders::_2));
+        sync_sub_.registerCallback(std::bind(&RecorderNode::sync_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, std::bind(&RecorderNode::joy_callback, this, std::placeholders::_1));
         saved_count_pub_ = this->create_publisher<std_msgs::msg::UInt64>("/recorder/saved_count", 10);
@@ -53,13 +54,15 @@ public:
     }
 
     using ApproxSyncPolicy = message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image,
+                                                                             teacar_msgs::msg::Motioncmd,
                                                                              teacar_msgs::msg::Motioncmd>;
 
 private:
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
 
     message_filters::Subscriber<sensor_msgs::msg::Image> image_sub_;
-    message_filters::Subscriber<teacar_msgs::msg::Motioncmd> motion_cmd_sub_;
+    message_filters::Subscriber<teacar_msgs::msg::Motioncmd> steer_sub_;
+    message_filters::Subscriber<teacar_msgs::msg::Motioncmd> throttle_sub_;
 
     message_filters::Synchronizer<ApproxSyncPolicy> sync_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
@@ -114,7 +117,8 @@ private:
     }
 
     void sync_callback(const sensor_msgs::msg::Image::ConstSharedPtr image,
-                       const teacar_msgs::msg::Motioncmd::ConstSharedPtr motion_cmd_msg)
+                       const teacar_msgs::msg::Motioncmd::ConstSharedPtr steer_msg,
+                       const teacar_msgs::msg::Motioncmd::ConstSharedPtr throttle_msg)
     {
         bool enable = enable_from_param_ || enable_from_js_;
 
@@ -141,6 +145,7 @@ private:
             if (!std::filesystem::exists(label_file_path_))
             {
                 label_file_ = std::ofstream(label_file_path_.string());
+                label_file_ << "image file, steer, throttle" << std::endl;
                 RCLCPP_INFO(this->get_logger(), "Opened label file %s", label_file_path_.c_str());
             }
 
@@ -148,7 +153,7 @@ private:
             std::filesystem::path image_path = image_folder_ / image_name;
 
             cv::imwrite(image_path.string(), cvImage->image);
-            label_file_ << image_name << "," << motion_cmd_msg->steer << "," << motion_cmd_msg->throttle << std::endl;
+            label_file_ << image_name << "," << steer_msg->value << "," << throttle_msg->value << std::endl;
             RCLCPP_DEBUG(this->get_logger(), "Image %s saved!", image_path.c_str());
             RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 10000, "Saved %d images", saved_image_count_);
 
@@ -184,11 +189,12 @@ private:
                     {
                         rclcpp::TimerBase::SharedPtr timer = this->create_wall_timer(
                             std::chrono::milliseconds(1),
-                            [this,timer=timer, data_folder=data_folder.string()]() {
-                                this->set_parameter(rclcpp::Parameter("data_folder_resolved", data_folder));;
-                                timer->cancel();  // run once
-                            }
-                        );
+                            [this, timer = timer, data_folder = data_folder.string()]()
+                            {
+                                this->set_parameter(rclcpp::Parameter("data_folder_resolved", data_folder));
+                                ;
+                                timer->cancel(); // run once
+                            });
                         label_file_.close();
                         image_folder_ = data_folder / "images";
                         label_file_path_ = data_folder / "labels.csv";

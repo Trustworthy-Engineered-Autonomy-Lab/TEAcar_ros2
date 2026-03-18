@@ -14,49 +14,38 @@ namespace controller
     public:
         Controller(const std::string &node_name) : rclcpp::Node(node_name)
         {
-            publisher_ = this->create_publisher<teacar_msgs::msg::Motioncmd>("/motion_cmd", 10);
+            publisher_ = this->create_publisher<teacar_msgs::msg::Motioncmd>("/motion", 10);
             callback_handle_ = this->add_on_set_parameters_callback(std::bind(&Controller::parameterCallback,
                                                                               this, std::placeholders::_1));
 
-            this->declare_parameter<double>("throttle_ratio", 1.0);
-            this->declare_parameter<double>("steer_ratio", 1.0);
-
-            RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
-            RCLCPP_INFO(this->get_logger(), " Controller %s Configuration", this->get_name());
-            RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
-            RCLCPP_INFO(this->get_logger(), "%-20s | %-10s", "Parameter", "Value");
-            RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
-            RCLCPP_INFO(this->get_logger(), "%-20s | %-10f", "throttle ratio", throttle_ratio_);
-            RCLCPP_INFO(this->get_logger(), "%-20s | %-10f", "Steer ratio", steer_ratio_);
-            RCLCPP_INFO(this->get_logger(), "-----------------------------------------------");
+            this->declare_parameter("positive_ratio", 1.0);
+            this->declare_parameter("negative_ratio", 1.0);
         }
 
-        void control(float throttle, float steer)
+        void control(float motion)
         {
             auto msg = teacar_msgs::msg::Motioncmd();
             msg.header.stamp = this->get_clock()->now();
-            msg.header.frame_id = this->get_name();
+            msg.source = this->get_name();
 
-            if (throttle > 0)
+            if (motion > 0)
             {
-                msg.throttle = throttle_ratio_ * std::log(1 + throttle * 1.71828);
+                msg.value = motion * pos_ratio_;
             }
             else
             {
-                msg.throttle = -throttle_ratio_ * std::log(1 - throttle * 1.71828);
+                msg.value = motion * neg_ratio_;
             }
-
-            msg.steer = steer * steer_ratio_;
 
             publisher_->publish(msg);
 
-            RCLCPP_DEBUG(this->get_logger(), "Sent motion cmd: throttle %f steer %f from node %s",
-                         msg.throttle, msg.steer, this->get_name());
+            RCLCPP_DEBUG(this->get_logger(), "Sent motion: %.2f from node %s",
+                         msg.value, this->get_name());
         }
 
     private:
-        float throttle_ratio_;
-        float steer_ratio_;
+        float pos_ratio_ = 1.0f;
+        float neg_ratio_ = 1.0f;
 
         rclcpp::Publisher<teacar_msgs::msg::Motioncmd>::SharedPtr publisher_;
         rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr callback_handle_;
@@ -65,15 +54,15 @@ namespace controller
         {
             for (const auto &param : parameters)
             {
-                if (param.get_name() == "throttle_ratio")
+                if (param.get_name() == "positive_ratio")
                 {
-                    throttle_ratio_ = param.as_double();
-                    RCLCPP_INFO(this->get_logger(), "Updated throttle_ratio: %f", throttle_ratio_);
+                    pos_ratio_ = param.as_double();
+                    RCLCPP_INFO(this->get_logger(), "Updated positive ratio: %f", pos_ratio_);
                 }
-                else if (param.get_name() == "steer_ratio")
+                else if (param.get_name() == "negative_ratio")
                 {
-                    steer_ratio_ = param.as_double();
-                    RCLCPP_INFO(this->get_logger(), "Updated steer_ratio: %f", steer_ratio_);
+                    neg_ratio_ = param.as_double();
+                    RCLCPP_INFO(this->get_logger(), "Updated negative ratio: %f", neg_ratio_);
                 }
             }
             rcl_interfaces::msg::SetParametersResult result;

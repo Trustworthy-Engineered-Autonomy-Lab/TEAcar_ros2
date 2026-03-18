@@ -1,6 +1,8 @@
 // pca9685_actuator_node.cpp
-#include "actuator.hpp" // Base class
-#include "rclcpp/rclcpp.hpp"
+
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/u_int32.hpp>
+
 #include <memory>
 #include <cmath>
 #include <cerrno>
@@ -166,67 +168,40 @@ private:
   }
 };
 
-class PCA9685ActuatorNode : public actuator::Actuator
+class PCA9685DriverNode : public rclcpp::Node
 {
 public:
-  PCA9685ActuatorNode() : actuator::Actuator()
+  PCA9685DriverNode() : rclcpp::Node("pca9685_driver_node")
   {
     pca_ = std::make_unique<PCA9685>();
     // Parameter update callback
     param_callback_handle_ = this->add_on_set_parameters_callback(
-        std::bind(&PCA9685ActuatorNode::on_parameter_change, this, std::placeholders::_1));
+        std::bind(&PCA9685DriverNode::on_parameter_change, this, std::placeholders::_1));
 
     this->declare_parameter("bus_device", std::string("/dev/i2c-1"));
     this->declare_parameter("pwm_frequency", 60);
-    this->declare_parameter("steer_pwm_channel", 1);
-    this->declare_parameter("throttle_pwm_channel", 0);
-    this->declare_parameter("steer_min_pulsewidth", 1000);
-    this->declare_parameter("steer_mid_pulsewidth", 1500);
-    this->declare_parameter("steer_max_pulsewidth", 2000);
-    this->declare_parameter("throttle_min_pulsewidth", 1000);
-    this->declare_parameter("throttle_mid_pulsewidth", 1500);
-    this->declare_parameter("throttle_max_pulsewidth", 2000);
+
+    for (int i = 0; i < 16; i++)
+    {
+      auto pulse_width_sub_ = this->create_subscription<std_msgs::msg::UInt32>(
+          "/pca9685/channel" + std::to_string(i) + "/pulse_width", 10,
+          [this, channel = i](const std_msgs::msg::UInt32::SharedPtr msg)
+          {
+            pulse_width_callback(channel, msg);
+          });
+      pulse_width_subs_.push_back(pulse_width_sub_);
+    }
 
     pca9685_monitor_ = this->create_wall_timer(
         std::chrono::milliseconds(100),
-        std::bind(&PCA9685ActuatorNode::pca9685_monitor_callback, this));
+        std::bind(&PCA9685DriverNode::pca9685_monitor_callback, this));
   }
 
-protected:
-  void actuate(float throttle, float steer) override
+  ~PCA9685DriverNode()
   {
-    if (!pca_->is_opened())
-      return;
-
-    float steer_pw = steer >= 0 ? steer * (steer_max_ - steer_mid_) + steer_mid_
-                                : steer * (steer_mid_ - steer_min_) + steer_mid_;
-    float throttle_pw = throttle >= 0 ? throttle * (throttle_max_ - throttle_mid_) + throttle_mid_
-                                      : throttle * (throttle_mid_ - throttle_min_) + throttle_mid_;
-    float cycle = 1000000.0f / pwm_freq_;
-
-    float steer_duty = steer_pw / cycle;
-    float throttle_duty = throttle_pw / cycle;
-
-    RCLCPP_DEBUG(this->get_logger(), "Calculated PWM -> Throttle: %.2f%%, Steer: %.2f%%", throttle_duty * 100, steer_duty * 100);
-
-    if (!pca_->set_pwm_dutycycle(throttle_ch_, throttle_duty))
+    if (pca_)
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to write throttle PWM: %s", pca_->get_error().c_str());
       pca_->close();
-    }
-    else
-    {
-      RCLCPP_DEBUG(this->get_logger(), "✅ Throttle PWM successfully written: duty = %.3f", throttle_duty);
-    }
-
-    if (!pca_->set_pwm_dutycycle(steer_ch_, steer_duty))
-    {
-      RCLCPP_ERROR(this->get_logger(), "Failed to write steer PWM: %s", pca_->get_error().c_str());
-      pca_->close();
-    }
-    else
-    {
-      RCLCPP_DEBUG(this->get_logger(), "✅ Steer PWM successfully written: duty = %.3f", steer_duty);
     }
   }
 
@@ -234,11 +209,10 @@ private:
   std::unique_ptr<PCA9685> pca_;
   std::string bus_device_;
   int pwm_freq_;
-  int steer_ch_, throttle_ch_;
-  int steer_min_, steer_mid_, steer_max_;
-  int throttle_min_, throttle_mid_, throttle_max_;
+
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
   rclcpp::TimerBase::SharedPtr pca9685_monitor_;
+  std::vector<rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr> pulse_width_subs_;
 
   rcl_interfaces::msg::SetParametersResult on_parameter_change(const std::vector<rclcpp::Parameter> &parameters)
   {
@@ -266,7 +240,7 @@ private:
             }
             else
             {
-              RCLCPP_INFO(this->get_logger(), "Bus device is set to %s. Opened pca9685 on %s.", new_bus_device.c_str());
+              RCLCPP_INFO(this->get_logger(), "Updated bus device: %s. Opened pca9685 on %s.", new_bus_device.c_str(), new_bus_device.c_str());
               bus_device_ = new_bus_device;
               pca_ = std::move(new_pca);
             }
@@ -278,48 +252,16 @@ private:
         pwm_freq_ = param.as_int();
         if (!pca_->is_opened())
         {
-          RCLCPP_ERROR(this->get_logger(), "Parameter value updated to %d. But failed to apply pwm frequency setting: pca9685 is not opened yet.", pwm_freq_);
+          RCLCPP_ERROR(this->get_logger(), "Updated PWM frequency: %d. But failed to apply setting: pca9685 is not opened yet.", pwm_freq_);
         }
         else if (!pca_->set_pwm_freq(pwm_freq_))
         {
-          RCLCPP_ERROR(this->get_logger(), "Parameter value updated to %d. But failed to apply pwm frequency setting: %s", pwm_freq_, pca_->get_error().c_str());
+          RCLCPP_ERROR(this->get_logger(), "Updated PWM frequency: %d. But failed to apply setting: %s", pwm_freq_, pca_->get_error().c_str());
         }
         else
         {
-          RCLCPP_INFO(this->get_logger(), "PWM frequencty is set to %d", pwm_freq_);
+          RCLCPP_INFO(this->get_logger(), "Updated PWM frequencty: %d", pwm_freq_);
         }
-      }
-      else if (param_name == "steer_pwm_channel")
-      {
-        steer_ch_ = check_pwm_channel(param.as_int(), steer_ch_, "steering");
-      }
-      else if (param_name == "throttle_pwm_channel")
-      {
-        throttle_ch_ = check_pwm_channel(param.as_int(), throttle_ch_, "throttle");
-      }
-      else if (param_name == "steer_min_pulsewidth")
-      {
-        steer_min_ = check_pwm_pulsewidth(param.as_int(), steer_min_, "minimum steering");
-      }
-      else if (param_name == "steer_mid_pulsewidth")
-      {
-        steer_mid_ = check_pwm_pulsewidth(param.as_int(), steer_mid_, "steering midpoint");
-      }
-      else if (param_name == "steer_max_pulsewidth")
-      {
-        steer_max_ = check_pwm_pulsewidth(param.as_int(), steer_max_, "maximum steering");
-      }
-      else if (param_name == "throttle_min_pulsewidth")
-      {
-        throttle_min_ = check_pwm_pulsewidth(param.as_int(), throttle_min_, "minimum throttle");
-      }
-      else if (param_name == "throttle_mid_pulsewidth")
-      {
-        throttle_mid_ = check_pwm_pulsewidth(param.as_int(), throttle_mid_, "throttle midpoint");
-      }
-      else if (param_name == "throttle_max_pulsewidth")
-      {
-        throttle_max_ = check_pwm_pulsewidth(param.as_int(), throttle_max_, "maximum throttle");
       }
     }
 
@@ -327,30 +269,6 @@ private:
     result.successful = true;
     result.reason = "Updated parameters successfully";
     return result;
-  }
-
-  int check_pwm_channel(int new_value, int old_value, const std::string &name)
-  {
-    if (new_value < 0 || new_value > 15)
-    {
-      RCLCPP_ERROR(this->get_logger(), "Invalid pwm channel %d for %s", new_value, name.c_str());
-      return old_value;
-    }
-
-    RCLCPP_INFO(this->get_logger(), "pwm channel for %s is set to %d", name.c_str(), new_value);
-    return new_value;
-  }
-
-  int check_pwm_pulsewidth(int new_value, int old_value, const std::string &name)
-  {
-    if (new_value < 0)
-    {
-      RCLCPP_ERROR(this->get_logger(), "Invalid pwm pulse width %d for %s", new_value, name.c_str());
-      return old_value;
-    }
-
-    RCLCPP_INFO(this->get_logger(), "pwm pulse width for %s is set to %d", name.c_str(), new_value);
-    return new_value;
   }
 
   void pca9685_monitor_callback()
@@ -363,12 +281,30 @@ private:
         RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Failed to open pca9685 on %s. Will retry", bus_device_.c_str());
     }
   }
+
+  void pulse_width_callback(int channel, const std_msgs::msg::UInt32::SharedPtr msg)
+  {
+    if (pca_->is_opened())
+    {
+      float period = 1000000.0f / pwm_freq_;
+      float duty_cycle = msg->data / period;
+      if (!pca_->set_pwm_dutycycle(channel, duty_cycle))
+      {
+        RCLCPP_ERROR(this->get_logger(), "Failed to set duty cycle %.2f for channel %d: %s", duty_cycle, channel, pca_->get_error().c_str());
+        pca_->close();
+      }
+      else
+      {
+        RCLCPP_DEBUG(this->get_logger(), "Set duty cycle %.2f for channel %d", duty_cycle, channel);
+      }
+    }
+  }
 };
 
 int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<PCA9685ActuatorNode>();
+  auto node = std::make_shared<PCA9685DriverNode>();
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

@@ -10,9 +10,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rcl_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
 find_package(teacar_msgs REQUIRED)  # Your custom message package
 
 
@@ -20,20 +18,23 @@ include_directories(
   include
 )
 
-
 # Build executable
-add_executable(pca9685_actuator src/pca9685_actuator.cpp)
+add_executable(pca9685_driver src/pca9685_driver.cpp)
+add_executable(pwm_based_actuator src/pwm_based_actuator.cpp)
 
-ament_target_dependencies(pca9685_actuator
+ament_target_dependencies(pca9685_driver
   rclcpp
-  rcl_interfaces
   std_msgs
-  sensor_msgs
+)
+
+ament_target_dependencies(pwm_based_actuator
+  rclcpp
+  std_msgs
   teacar_msgs
 )
 
 # Install
-install(TARGETS pca9685_actuator
+install(TARGETS pca9685_driver pwm_based_actuator
   DESTINATION lib/${PROJECT_NAME}
 )
 
