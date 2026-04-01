@@ -15,6 +15,7 @@ find_package(std_msgs REQUIRED)
 find_package(teacar_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
 # Include directories
 include_directories(
@@ -52,6 +53,12 @@ ament_target_dependencies(nn_controller rclcpp sensor_msgs inferencer std_msgs t
 target_include_directories(nn_controller PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(nn_controller
+  Boost::filesystem
+  /usr/lib/aarch64-linux-gnu/libcurl.so
+  ${CMAKE_DL_LIBS}
 )
 
 

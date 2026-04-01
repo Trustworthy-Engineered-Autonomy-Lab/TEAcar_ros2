@@ -11,6 +11,9 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
+#include <boost/dll.hpp>
+#include <boost/function.hpp>
+
 class NNControllerNode : public controller::Controller
 {
 public:
@@ -103,12 +106,20 @@ private:
         {
         case Status::INIT_BACKEND:
         {
+            std::string lib_name = backend_ + "_inferencer";
+
             try
             {
-                // Dynamically load the inferencer backend
-                inferencer_ = std::make_shared<inferencer::Inferencer>(backend_);
+                // Dynamically load the inferencer backend via Boost.DLL
+                using Creator = std::shared_ptr<inferencer::Inferencer>();
+                boost::function<Creator> creator = boost::dll::import_alias<Creator>(
+                    lib_name, lib_name,
+                    boost::dll::load_mode::append_decorations |
+                    boost::dll::load_mode::search_system_folders);
+
+                inferencer_ = creator();
             }
-            catch (const std::runtime_error &e)
+            catch (const boost::system::system_error &e)
             {
                 RCLCPP_ERROR(this->get_logger(), "Failed to initialize the %s backend: %s. Will retry",
                              backend_.c_str(), e.what());
@@ -132,7 +143,7 @@ private:
             bool ok = false;
             try
             {
-                ok = inferencer_->load_model(model_file_.c_str());
+                ok = inferencer_->loadModel(model_file_);
             }
             catch (const std::runtime_error &e)
             {
@@ -144,7 +155,7 @@ private:
             if (!ok)
             {
                 RCLCPP_ERROR(this->get_logger(), "Failed to load model file %s: %s. Will retry",
-                             model_file_.c_str(), inferencer_->get_error_string());
+                             model_file_.c_str(), inferencer_->getErrorString().c_str());
                 return;
             }
 
@@ -157,7 +168,7 @@ private:
         {
             try
             {
-                output_buffer_size_ = inferencer_->get_output_buffer(output_name_.c_str(), &output_buffer_);
+                output_buffer_size_ = inferencer_->getOutputBuffer(output_name_, &output_buffer_);
             }
             catch (const std::runtime_error &e)
             {
@@ -169,7 +180,7 @@ private:
             if (output_buffer_size_ == 0)
             {
                 RCLCPP_ERROR(this->get_logger(), "Failed to alloc output '%s': %s. Will retry.",
-                             output_name_.c_str(), inferencer_->get_error_string());
+                             output_name_.c_str(), inferencer_->getErrorString().c_str());
                 return;
             }
 
@@ -191,7 +202,7 @@ private:
         {
             try
             {
-                input_buffer_size_ = inferencer_->get_input_buffer(input_name_.c_str(), &input_buffer_);
+                input_buffer_size_ = inferencer_->getInputBuffer(input_name_, &input_buffer_);
             }
             catch (const std::runtime_error &e)
             {
@@ -203,7 +214,7 @@ private:
             if (input_buffer_size_ == 0)
             {
                 RCLCPP_ERROR(this->get_logger(), "Failed to allocate input tensor %s: %s. Will retry",
-                             input_name_.c_str(), inferencer_->get_error_string());
+                             input_name_.c_str(), inferencer_->getErrorString().c_str());
                 return;
             }
 
@@ -303,7 +314,7 @@ private:
 
         if (!inferencer_->infer())
         {
-            RCLCPP_ERROR(this->get_logger(), "Inference failed: %s", inferencer_->get_error_string());
+            RCLCPP_ERROR(this->get_logger(), "Inference failed: %s", inferencer_->getErrorString().c_str());
             // unsubscribe and re-init
             resetToInit();
             return;
@@ -312,8 +323,6 @@ private:
         const float steer = *reinterpret_cast<float *>(output_buffer_);
 
         // Only controls steer; throttle is managed elsewhere.
-        // Note: original code used control(0.0f, steer). If your base class does not
-        // provide controlSteer(), change this call back to control(0.0f, steer).
         this->control(0.0f, steer); // publishes /motion_cmd
 
         RCLCPP_DEBUG(this->get_logger(), "Inference OK, steer=%f", steer);

@@ -17,6 +17,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
 # ---------- TensorRT backend (requires CUDA + TensorRT) ----------
 find_package(CUDA REQUIRED)
@@ -31,6 +32,7 @@ target_link_libraries(tensorrt_inferencer
   nvinfer
   nvonnxparser
   stdc++fs    # std::filesystem
+  Boost::filesystem
 )
 install(TARGETS tensorrt_inferencer DESTINATION lib)
 
@@ -38,6 +40,7 @@ install(TARGETS tensorrt_inferencer DESTINATION lib)
 # DUMMY: Remove this target before publication
 add_library(dummy_inferencer SHARED src/dummy_inferencer.cpp)
 target_include_directories(dummy_inferencer PRIVATE include)
+target_link_libraries(dummy_inferencer Boost::filesystem)
 install(TARGETS dummy_inferencer DESTINATION lib)
 # DUMMY: End dummy backend
 
