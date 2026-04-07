@@ -10,14 +10,31 @@ joy_node:
   ros__parameters:
     dev: "/dev/input/js0"
 
+# joystick_controller_node:
+#   ros__parameters:
+#     # Joystick Ratio Settings
+#     throttle_ratio: 0.6
+#     steer_ratio: -1.0
+#     # Joystick Channel Setting
+#     throttle_axis: 4
+#     steer_axis: 0
+
 joystick_controller_node:
   ros__parameters:
-    # Joystick Ratio Settings
     throttle_ratio: 0.6
     steer_ratio: -1.0
-    # Joystick Channel Setting
-    throttle_axis: 4
+
     steer_axis: 0
+
+    decel_button: 0
+    stop_button: 1
+    init_speed_button: 2
+    accel_button: 3
+
+    initial_speed: 0.20
+    speed_step: 0.02
+    min_speed: 0.0
+    max_speed: 0.40
 
 pca9685_actuator_node:
   ros__parameters:
