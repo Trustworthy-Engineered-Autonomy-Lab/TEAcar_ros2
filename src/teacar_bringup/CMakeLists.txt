@@ -25,13 +25,7 @@ endif()
 
 #Install launch files
 install(
-  DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}
-)
-
-# DUMMY: Install dummy model for testing — remove before publication
-install(
-  DIRECTORY models
+  DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 

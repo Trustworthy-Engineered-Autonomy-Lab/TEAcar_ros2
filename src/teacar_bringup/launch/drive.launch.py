@@ -1,65 +1,74 @@
 from launch import LaunchDescription
-from launch.actions import SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
+
+    teacar_bringup_pkg = FindPackageShare('teacar_bringup')
+
+    config_file_arg = DeclareLaunchArgument(
+        "config_file",
+        default_value=PathJoinSubstitution([teacar_bringup_pkg, 'config', 'drive_config.yaml'])
+    )
+
+    camera_launch = IncludeLaunchDescription(
+        PathJoinSubstitution([teacar_bringup_pkg, 'launch', 'camera.launch.py']),
+        launch_arguments={
+            "config_file": LaunchConfiguration("config_file")
+        }.items()
+    )
+
+    # Joystick driver node
+    joy_node = Node(
+        package="joy_linux",
+        executable="joy_linux_node",
+        name="joy_linux_node",
+        output="screen",
+        parameters=[
+            LaunchConfiguration("config_file"),
+        ]
+    )
+    
+    # Joystick controller node
+    joystick_controller_node = Node(
+        package="controller",
+        executable="joystick_controller",
+        name="joystick_controller_node",
+        output="screen",
+        parameters=[
+            LaunchConfiguration("config_file")
+        ]
+    )
+    
+    # Parameter controller node
+    param_controller_node = Node(
+        package="controller",
+        executable="param_controller",
+        name="param_controller_node",
+        output="screen",
+        parameters=[
+            LaunchConfiguration("config_file")
+        ]
+    )
+
+    # Actuator node
+    pca9685_actuator_node = Node(
+        package="actuator",
+        executable="pca9685_actuator",
+        name="pca9685_actuator_node",
+        output="screen",
+        parameters=[
+            LaunchConfiguration("config_file"),
+        ]
+    )
+    
     return LaunchDescription([
-
-        # Set environment variable for camera
-        SetEnvironmentVariable(
-            name="GSCAM_CONFIG",
-            value=("nvarguscamerasrc ! video/x-raw(memory:NVMM), width=1280, height=720, "
-                   "format=NV12, framerate=30/1 ! nvvidconv flip-method=2 ! nvvidconv ! "
-                   "video/x-raw, width=224, height=224, format=BGRx ! videoconvert")
-        ),
-
-        # Joystick driver node
-        Node(
-            package="joy",
-            executable="joy_node",
-            name="joy_node",
-            output="screen",
-            parameters=[{"dev_ff": "/dev/input/event2"}]
-        ),
-
-        # Joystick controller node
-        Node(
-            package="controller",
-            executable="param_controller",
-            name="param_controller_node",
-            output="screen",
-            parameters=[
-                # Joystick Ratio Settings
-                {"throttle_ratio": 0.6},
-                {"steer_ratio": -1.0},
-                # Joystick Channel Setting
-                {"throttle_axis": 4},
-                {"steer_axis": 0}
-            ]
-        ),
-
-        # Actuator node
-        Node(
-            package="actuator",
-            executable="pca9685_actuator",
-            name="pca9685_actuator_node",
-            output="screen",
-            parameters=[
-                # PWM Frequency and Bus Configuration
-                {"bus_device": "/dev/i2c-7"},
-                {"pwm_frequency": 60},
-
-                # Throttle Configuration
-                {"throttle_pwm_channel": 0},
-                {"throttle_min_pulsewidth": 1000},
-                {"throttle_max_pulsewidth": 2000},
-                {"throttle_mid_pulsewidth": 1500},
-
-                # Steer Configuration
-                {"steer_pwm_channel": 1},
-                {"steer_min_pulsewidth": 1200},
-                {"steer_max_pulsewidth": 2000},
-                {"steer_mid_pulsewidth": 1600},
-            ]
-        ),
+        config_file_arg,
+        camera_launch,
+        joy_node,
+        param_controller_node,
+        joystick_controller_node,
+        pca9685_actuator_node
     ])
