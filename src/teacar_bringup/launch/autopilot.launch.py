@@ -20,9 +20,9 @@ def generate_launch_description():
             name="GSCAM_CONFIG",
             value=(
                 "nvarguscamerasrc "
-                "! video/x-raw(memory:NVMM), width=3280, height=2464, format=NV12, framerate=21/1 "
+                "! video/x-raw(memory:NVMM), width=1280, height=720, format=NV12, framerate=21/1 "
                 "! nvvidconv flip-method=2 "
-                "! video/x-raw, width=224, height=224, format=BGRx "
+                "! video/x-raw, width=1280, height=720, format=BGRx "
                 "! videocrop left=0 right=0 top=80 bottom=0 "
                 "! videoconvert "
             ),
@@ -47,7 +47,7 @@ def generate_launch_description():
                 {"model_file": os.path.join(bringup_share, "models", "best.onnx")},
                 {"input_name": "img_in"},
                 {"output_name": "steer"},
-                {"roi": {"x": 0, "y": 80, "width": 224, "height": 144}},
+                {"roi": {"x": 0, "y": 0, "width": 1280, "height": 720}},
             ],
             remappings=[
                 ("image_raw", "/camera/image_raw"),
