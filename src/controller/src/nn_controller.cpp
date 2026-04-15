@@ -29,10 +29,10 @@ public:
         this->declare_parameter<std::string>("output_name", "outputs");
         this->declare_parameter<std::string>("input_name", "inputs");
 
-        this->declare_parameter<int>("roi/x", 0);
-        this->declare_parameter<int>("roi/y", 0);
-        this->declare_parameter<int>("roi/width", 0);  // 0 => default to image width
-        this->declare_parameter<int>("roi/height", 0); // 0 => default to image height
+        this->declare_parameter<int>("roi.x", 0);
+        this->declare_parameter<int>("roi.y", 0);
+        this->declare_parameter<int>("roi.width", 0);  // 0 => default to image width
+        this->declare_parameter<int>("roi.height", 0); // 0 => default to image height
 
         // Load parameters once at startup
         backend_ = this->get_parameter("backend").as_string();
@@ -242,11 +242,11 @@ private:
 
     void firstImageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
     {
-        const int x = this->get_parameter("roi/x").as_int();
-        const int y = this->get_parameter("roi/y").as_int();
+        const int x = this->get_parameter("roi.x").as_int();
+        const int y = this->get_parameter("roi.y").as_int();
 
-        int roi_w = this->get_parameter("roi/width").as_int();
-        int roi_h = this->get_parameter("roi/height").as_int();
+        int roi_w = this->get_parameter("roi.width").as_int();
+        int roi_h = this->get_parameter("roi.height").as_int();
         if (roi_w <= 0)
             roi_w = static_cast<int>(msg->width);
         if (roi_h <= 0)
