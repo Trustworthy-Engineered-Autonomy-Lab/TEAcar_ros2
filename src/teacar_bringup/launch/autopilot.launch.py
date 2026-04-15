@@ -9,12 +9,12 @@ import os
 def generate_launch_description():
     bringup_share = get_package_share_directory('teacar_bringup')
 
-    drive_launch = os.path.join(bringup_share, 'launch', 'drive.launch.py')
+    #drive_launch = os.path.join(bringup_share, 'launch', 'drive.launch.py')
 
     return LaunchDescription([
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(drive_launch)
-        ),
+        #IncludeLaunchDescription(
+        #    PythonLaunchDescriptionSource(drive_launch)
+        #),
 
         SetEnvironmentVariable(
             name="GSCAM_CONFIG",
