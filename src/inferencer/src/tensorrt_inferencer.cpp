@@ -1,21 +1,16 @@
-// tensorrt_inferencer.cpp (TensorRT 10 backend, ROS 2 compatible)
-// Implements the Inferencer abstract base class using TensorRT 10 APIs.
-
+#include <cuda_runtime_api.h>
 #include <inferencer/inferencer.h>
 
-#include <cuda_runtime_api.h>
 #include <NvInfer.h>
 #include <NvOnnxParser.h>
-#include <fstream>
-#include <iostream>
-#include <vector>
-#include <map>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <filesystem>
 
+#include <boost/filesystem.hpp>
 #include <boost/dll/alias.hpp>
+
+#include <fstream>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace inferencer
 {
@@ -23,85 +18,117 @@ namespace inferencer
 class RTInferencer : public Inferencer
 {
 public:
-    RTInferencer()
+    RTInferencer() : buffers(1, nullptr)
     {
-        if (cudaStreamCreate(&stream) != cudaSuccess) {
-            throw std::runtime_error("Failed to create CUDA stream");
+        cudaError_t error = cudaStreamCreate(&stream);
+        if (error != cudaSuccess)
+        {
+            throw std::runtime_error(
+                "Failed to create cuda stream: " + std::string(cudaGetErrorString(error)));
         }
     }
 
     ~RTInferencer()
     {
         cudaStreamDestroy(stream);
-        for (auto& [name, buf] : buffers) {
-            if (buf) cudaFree(buf);
+        for (const auto & buffer : buffers)
+        {
+            if (buffer != nullptr)
+                cudaFree(buffer);
         }
     }
 
-    bool loadModel(const std::string& name) override
+    bool loadModel(const std::string & modelName) final
     {
-        std::filesystem::path p(name);
-        if (p.extension() == ".engine") {
-            engine = loadEngine(name);
-        } else if (p.extension() == ".onnx") {
-            auto cached = p;
-            cached.replace_extension(".engine");
-            if (std::filesystem::exists(cached)) {
-                engine = loadEngine(cached);
+        boost::filesystem::path filePath(modelName);
+        std::string fileExt = filePath.extension().string();
+
+        if (fileExt == ".onnx")
+        {
+            boost::filesystem::path engineFilePath = filePath;
+            engineFilePath.replace_extension("engine");
+
+            if (boost::filesystem::exists(engineFilePath))
+            {
+                engine = loadEngine(engineFilePath.string());
             }
-            if (!engine) {
-                engine = loadOnnx(name);
-                if (engine) saveEngine(cached);
+
+            if (engine == nullptr)
+            {
+                engine = loadOnnx(filePath.string());
+                if (engine != nullptr)
+                    saveEngine(engineFilePath.string());
             }
-        } else {
-            errorString = "Unsupported model format";
+        }
+        else if (fileExt == ".engine")
+        {
+            engine = loadEngine(filePath.string());
+        }
+        else
+        {
+            errorString = "Unsupported model file format " + fileExt;
             return false;
         }
-        if (!engine) return false;
+
+        if (engine == nullptr)
+        {
+            return false;
+        }
+
         context.reset(engine->createExecutionContext());
-        return context != nullptr;
+        if (context == nullptr)
+        {
+            throw std::runtime_error("Failed to create tensorrt execution context");
+        }
+
+        return true;
     }
 
-    unsigned getInputBuffer(const std::string& name, void** buffer) override
+    unsigned getInputBuffer(const std::string & inputName, void ** buffer) final
     {
-        // TRT 10: use tensor name-based API instead of binding index
-        auto dims  = engine->getTensorShape(name.c_str());
-        auto dtype = engine->getTensorDataType(name.c_str());
-        if (dims.nbDims == 0) {
-            errorString = "Tensor not found: " + name;
+        int inputIndex = engine->getBindingIndex(inputName.c_str());
+        if (inputIndex == -1)
+        {
+            errorString = "Invalid input tensor name " + inputName;
             return 0;
         }
-        size_t sz = getVolume(dims) * getTypeSize(dtype);
-        *buffer = allocBuffer(name, sz);
-        return sz;
+
+        nvinfer1::Dims inputDims = engine->getBindingDimensions(inputIndex);
+        nvinfer1::DataType inputDataType = engine->getBindingDataType(inputIndex);
+        size_t inputSize = getVolume(inputDims) * getDataTypeSize(inputDataType);
+
+        *buffer = allocBuffer(inputIndex, inputSize);
+        if (*buffer == nullptr)
+            return 0;
+
+        return static_cast<unsigned>(inputSize);
     }
 
-    unsigned getOutputBuffer(const std::string& name, void** buffer) override
+    unsigned getOutputBuffer(const std::string & outputName, void ** buffer) final
     {
-        // TRT 10: use tensor name-based API instead of binding index
-        auto dims  = engine->getTensorShape(name.c_str());
-        auto dtype = engine->getTensorDataType(name.c_str());
-        if (dims.nbDims == 0) {
-            errorString = "Tensor not found: " + name;
+        int outputIndex = engine->getBindingIndex(outputName.c_str());
+        if (outputIndex == -1)
+        {
+            errorString = "Invalid output tensor name " + outputName;
             return 0;
         }
-        size_t sz = getVolume(dims) * getTypeSize(dtype);
-        *buffer = allocBuffer(name, sz);
-        return sz;
+
+        nvinfer1::Dims outputDims = engine->getBindingDimensions(outputIndex);
+        nvinfer1::DataType outputDataType = engine->getBindingDataType(outputIndex);
+        size_t outputSize = getVolume(outputDims) * getDataTypeSize(outputDataType);
+
+        *buffer = allocBuffer(outputIndex, outputSize);
+        if (*buffer == nullptr)
+            return 0;
+
+        return static_cast<unsigned>(outputSize);
     }
 
-    bool infer() override
+    bool infer() final
     {
-        // TRT 10: set tensor addresses before enqueueV3
-        for (auto& [name, ptr] : buffers) {
-            if (!context->setTensorAddress(name.c_str(), ptr)) {
-                errorString = "Failed to set tensor address for: " + name;
-                return false;
-            }
-        }
-
-        if (!context->enqueueV3(stream)) {
-            errorString = "Failed to enqueue inference";
+        if (!context->enqueueV2(buffers.data(), stream, nullptr))
+        {
+            errorString = "Failed to enqueue the stream";
             return false;
         }
 
@@ -109,7 +136,7 @@ public:
         return true;
     }
 
-    const std::string& getErrorString() const override
+    const std::string & getErrorString() const final
     {
         return errorString;
     }
@@ -120,108 +147,248 @@ public:
     }
 
 private:
-    class Logger : public nvinfer1::ILogger {
-        void log(Severity severity, const char* msg) noexcept override {
-            if (severity <= Severity::kWARNING) {
-                std::cerr << "[TensorRT] " << msg << std::endl;
+    // ---------------------------------------------------------------
+    // TensorRT object lifetime management
+    // ---------------------------------------------------------------
+    struct NvInferDeleter
+    {
+        template<typename T>
+        void operator()(T * obj) const
+        {
+            if (obj)
+                obj->destroy();
+        }
+    };
+
+    // ---------------------------------------------------------------
+    // Logger: replaces ROS_* macros with stderr output.
+    // The inferencer is a shared library with no rclcpp node context,
+    // so we write directly to stderr (consistent with dummy_inferencer).
+    // ---------------------------------------------------------------
+    class Logger : public nvinfer1::ILogger
+    {
+        void log(Severity severity, const char * msg) noexcept override
+        {
+            switch (severity)
+            {
+                case Severity::kVERBOSE:
+                    fprintf(stderr, "[TRT DEBUG]   %s\n", msg);
+                    break;
+                case Severity::kINFO:
+                    fprintf(stderr, "[TRT INFO]    %s\n", msg);
+                    break;
+                case Severity::kWARNING:
+                    fprintf(stderr, "[TRT WARNING] %s\n", msg);
+                    break;
+                case Severity::kERROR:
+                    fprintf(stderr, "[TRT ERROR]   %s\n", msg);
+                    break;
+                case Severity::kINTERNAL_ERROR:
+                    fprintf(stderr, "[TRT FATAL]   %s\n", msg);
+                    break;
+                default:
+                    fprintf(stderr, "[TRT UNKNOWN] %s\n", msg);
+                    break;
             }
         }
     } logger;
 
-    std::unique_ptr<nvinfer1::ICudaEngine> engine;
-    std::unique_ptr<nvinfer1::IExecutionContext> context;
-    std::map<std::string, void*> buffers;    // tensor name -> GPU buffer
-    std::map<std::string, size_t> buf_sizes; // tensor name -> byte size
-    cudaStream_t stream;
-    std::string errorString;
+    std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter>       engine;
+    std::unique_ptr<nvinfer1::IExecutionContext, NvInferDeleter>  context;
 
-    // ----- Helper: compute element count from dims -----
-    static size_t getVolume(const nvinfer1::Dims& dims) {
-        size_t vol = 1;
-        for (int i = 0; i < dims.nbDims; ++i) vol *= dims.d[i];
-        return vol;
-    }
+    std::vector<void *> buffers;
+    cudaStream_t        stream;
+    std::string         errorString;
 
-    static size_t getTypeSize(nvinfer1::DataType type) {
-        switch (type) {
-        case nvinfer1::DataType::kFLOAT: return 4;
-        case nvinfer1::DataType::kHALF:  return 2;
-        case nvinfer1::DataType::kINT8:  return 1;
-        case nvinfer1::DataType::kINT32: return 4;
-        case nvinfer1::DataType::kBOOL:  return 1;
-        default: return 0;
-        }
-    }
+    // ---------------------------------------------------------------
+    // Build engine from ONNX
+    // ---------------------------------------------------------------
+    std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter>
+    loadOnnx(const std::string & fileName)
+    {
+        std::unique_ptr<nvinfer1::IBuilder, NvInferDeleter>
+            builder{nvinfer1::createInferBuilder(logger)};
+        if (!builder)
+            throw std::runtime_error("Failed to create tensorrt network builder");
 
-    // ----- Load from ONNX, build serialized network, then deserialize -----
-    std::unique_ptr<nvinfer1::ICudaEngine> loadOnnx(const std::string& file) {
-        // TRT 10: createNetworkV2(0) — kEXPLICIT_BATCH is deprecated / default
-        auto builder = std::unique_ptr<nvinfer1::IBuilder>{nvinfer1::createInferBuilder(logger)};
-        auto network = std::unique_ptr<nvinfer1::INetworkDefinition>{
-            builder->createNetworkV2(1U << (uint32_t)nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH)
-        };
-        auto parser  = std::unique_ptr<nvonnxparser::IParser>{nvonnxparser::createParser(*network, logger)};
+        const auto explicitBatch =
+            1U << static_cast<uint32_t>(
+                nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
 
-        if (!parser->parseFromFile(file.c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
-            errorString = "Failed to parse ONNX: " + file;
+        std::unique_ptr<nvinfer1::INetworkDefinition, NvInferDeleter>
+            network{builder->createNetworkV2(explicitBatch)};
+        if (!network)
+            throw std::runtime_error("Failed to build tensorrt network");
+
+        std::unique_ptr<nvonnxparser::IParser, NvInferDeleter>
+            parser{nvonnxparser::createParser(*network, logger)};
+        if (!parser)
+            throw std::runtime_error("Failed to create onnx model parser");
+
+        if (!parser->parseFromFile(
+                fileName.c_str(),
+                static_cast<int32_t>(nvinfer1::ILogger::Severity::kVERBOSE)))
+        {
+            errorString = "Failed to parse onnx model file " + fileName;
             return nullptr;
         }
 
-        auto config = std::unique_ptr<nvinfer1::IBuilderConfig>{builder->createBuilderConfig()};
-        size_t totalMem = 0;
-        cudaMemGetInfo(nullptr, &totalMem);
-        // TRT 10: setMemoryPoolLimit replaces setMaxWorkspaceSize
-        config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, totalMem / 4);
+        std::unique_ptr<nvinfer1::IBuilderConfig, NvInferDeleter>
+            config{builder->createBuilderConfig()};
+        if (!config)
+            throw std::runtime_error("Failed to create tensorrt builder configuration");
 
-        // TRT 10: buildSerializedNetwork replaces buildEngineWithConfig
-        auto serialized = std::unique_ptr<nvinfer1::IHostMemory>{
-            builder->buildSerializedNetwork(*network, *config)};
-        if (!serialized) {
-            errorString = "Failed to build serialized network from: " + file;
+        size_t totalMemory = 0;
+        cudaError_t err = cudaMemGetInfo(nullptr, &totalMemory);
+        if (err != cudaSuccess)
+            throw std::runtime_error(
+                "Failed to get cuda memory info: " + std::string(cudaGetErrorString(err)));
+
+        config->setMaxWorkspaceSize(totalMemory / 4);
+
+        nvinfer1::IOptimizationProfile * profile = builder->createOptimizationProfile();
+        if (!profile)
+            throw std::runtime_error("Failed to create tensorrt optimization profile");
+
+        nvinfer1::ITensor * input     = network->getInput(0);
+        const char *        inputName = input->getName();
+        nvinfer1::Dims      dims      = input->getDimensions();
+        dims.d[0] = 1;
+
+        profile->setDimensions(inputName, nvinfer1::OptProfileSelector::kMIN, dims);
+        profile->setDimensions(inputName, nvinfer1::OptProfileSelector::kOPT, dims);
+        profile->setDimensions(inputName, nvinfer1::OptProfileSelector::kMAX, dims);
+        config->addOptimizationProfile(profile);
+
+        std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter>
+            eng{builder->buildEngineWithConfig(*network, *config)};
+        if (!eng)
+        {
+            errorString = "Failed to build tensorrt engine from onnx model " + fileName;
             return nullptr;
         }
 
-        auto runtime = std::unique_ptr<nvinfer1::IRuntime>{nvinfer1::createInferRuntime(logger)};
-        return std::unique_ptr<nvinfer1::ICudaEngine>{
-            runtime->deserializeCudaEngine(serialized->data(), serialized->size())};
+        return eng;
     }
 
-    // ----- Load a pre-built .engine file -----
-    std::unique_ptr<nvinfer1::ICudaEngine> loadEngine(const std::string& path) {
-        std::ifstream f(path, std::ios::binary);
-        if (!f) return nullptr;
-        f.seekg(0, std::ios::end);
-        size_t size = f.tellg();
-        f.seekg(0);
-        std::vector<char> buf(size);
-        f.read(buf.data(), size);
-        auto runtime = std::unique_ptr<nvinfer1::IRuntime>{nvinfer1::createInferRuntime(logger)};
-        return std::unique_ptr<nvinfer1::ICudaEngine>{runtime->deserializeCudaEngine(buf.data(), size)};
+    // ---------------------------------------------------------------
+    // Deserialise a .engine file
+    // ---------------------------------------------------------------
+    std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter>
+    loadEngine(const std::string & fileName)
+    {
+        std::ifstream file(fileName, std::ios::binary);
+        if (!file)
+        {
+            errorString = "Model file " + fileName + " does not exist";
+            return nullptr;
+        }
+
+        file.seekg(0, std::ios::end);
+        size_t fileSize = static_cast<size_t>(file.tellg());
+        file.seekg(0, std::ios::beg);
+
+        std::vector<char> engineData(fileSize);
+        file.read(engineData.data(), static_cast<std::streamsize>(fileSize));
+        if (!file)
+        {
+            errorString = "Failed to read the model file " + fileName;
+            return nullptr;
+        }
+        file.close();
+
+        std::unique_ptr<nvinfer1::IRuntime, NvInferDeleter>
+            runtime{nvinfer1::createInferRuntime(logger)};
+        if (!runtime)
+            throw std::runtime_error("Failed to create tensorrt runtime");
+
+        std::unique_ptr<nvinfer1::ICudaEngine, NvInferDeleter>
+            eng{runtime->deserializeCudaEngine(engineData.data(), engineData.size())};
+        if (!eng)
+        {
+            errorString = "Failed to deserialize tensorrt engine file " + fileName;
+            return nullptr;
+        }
+
+        return eng;
     }
 
-    // ----- Save serialized engine to disk -----
-    bool saveEngine(const std::string& path) {
-        auto ser = std::unique_ptr<nvinfer1::IHostMemory>{engine->serialize()};
-        std::ofstream f(path, std::ios::binary);
-        if (!f) return false;
-        f.write(static_cast<const char*>(ser->data()), ser->size());
+    // ---------------------------------------------------------------
+    // Serialise engine to disk
+    // ---------------------------------------------------------------
+    bool saveEngine(const std::string & fileName)
+    {
+        std::unique_ptr<nvinfer1::IHostMemory, NvInferDeleter>
+            serializedModel{engine->serialize()};
+
+        std::ofstream file(fileName, std::ios::binary);
+        if (!file)
+        {
+            errorString = "Failed to create the engine file " + fileName;
+            return false;
+        }
+
+        file.write(
+            static_cast<const char *>(serializedModel->data()),
+            static_cast<std::streamsize>(serializedModel->size()));
+        if (!file)
+        {
+            errorString = "Failed to write to the engine file " + fileName;
+            return false;
+        }
+
+        file.close();
         return true;
     }
 
-    // ----- Allocate or return existing CUDA managed buffer for a tensor -----
-    void* allocBuffer(const std::string& name, size_t sz) {
-        auto it = buffers.find(name);
-        if (it != buffers.end() && it->second != nullptr) {
-            return it->second;
+    // ---------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------
+    static size_t getDataTypeSize(nvinfer1::DataType type)
+    {
+        switch (type)
+        {
+            case nvinfer1::DataType::kFLOAT: return 4;
+            case nvinfer1::DataType::kHALF:  return 2;
+            case nvinfer1::DataType::kINT8:  return 1;
+            case nvinfer1::DataType::kINT32: return 4;
+            case nvinfer1::DataType::kBOOL:  return 1;
+            default:                         return 0;
         }
-        void* ptr = nullptr;
-        cudaMallocManaged(&ptr, sz);
-        buffers[name] = ptr;
-        buf_sizes[name] = sz;
-        return ptr;
+    }
+
+    static size_t getVolume(const nvinfer1::Dims & dims)
+    {
+        size_t volume = 1;
+        for (int i = 0; i < dims.nbDims; ++i)
+        {
+            if (dims.d[i] == -1)
+                return 0;
+            volume *= static_cast<size_t>(dims.d[i]);
+        }
+        return volume;
+    }
+
+    void * allocBuffer(int index, size_t size)
+    {
+        if (index + 1 > static_cast<int>(buffers.size()))
+            buffers.resize(static_cast<size_t>(index) + 1, nullptr);
+
+        if (buffers[index] != nullptr)
+            return buffers[index];
+
+        void * buffer = nullptr;
+        cudaError_t error = cudaMallocManaged(&buffer, size);
+        if (error != cudaSuccess)
+            throw std::runtime_error(
+                "Failed to allocate memory for tensor buffer: " +
+                std::string(cudaGetErrorString(error)));
+
+        buffers[index] = buffer;
+        return buffer;
     }
 };
 
-} // namespace inferencer
+}  // namespace inferencer
 
-BOOST_DLL_ALIAS(inferencer::RTInferencer::create, tensorrt_inferencer);
+BOOST_DLL_ALIAS(inferencer::RTInferencer::create, tensorrt_inferencer)

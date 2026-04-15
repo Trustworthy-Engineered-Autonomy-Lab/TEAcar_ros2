@@ -44,9 +44,10 @@ def generate_launch_description():
                 {"steer_ratio": -1.0},
                 {"backend": "tensorrt"},
                 # DUMMY: Replace with real model path before publication
-                {"model_file": os.path.join(bringup_share, "models", "dummy_model.onnx")},
-                {"input_name": "image"},
+                {"model_file": os.path.join(bringup_share, "models", "best.onnx")},
+                {"input_name": "img_in"},
                 {"output_name": "steer"},
+                {"roi": {"x": 0, "y": 80, "width": 224, "height": 144}},
             ],
             remappings=[
                 ("image_raw", "/camera/image_raw"),
