@@ -127,15 +127,22 @@ private:
             cv_bridge::CvImageConstPtr cvImage;
             try
             {
-                cvImage = cv_bridge::toCvShare(image, image->encoding);
+                cvImage = cv_bridge::toCvCopy(image, sensor_msgs::image_encodings::BGR8);
             }
             catch (cv_bridge::Exception &e)
             {
                 RCLCPP_ERROR(this->get_logger(), "Failed to convert image: %s", e.what());
+                return;
             }
             if (!std::filesystem::exists(image_folder_))
             {
-                std::filesystem::create_directories(image_folder_);
+                std::error_code ec;
+                std::filesystem::create_directories(image_folder_, ec);
+                if (ec)
+                {
+                    RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Failed to create %s: %s", image_folder_.c_str(), ec.message().c_str());
+                    return;
+                }
                 RCLCPP_INFO(this->get_logger(), "Created folder %s", std::filesystem::absolute(image_folder_).c_str());
             }
             if (!std::filesystem::exists(label_file_path_))
@@ -150,7 +157,7 @@ private:
             cv::imwrite(image_path.string(), cvImage->image);
             label_file_ << image_name << "," << motion_cmd_msg->steer << "," << motion_cmd_msg->throttle << std::endl;
             RCLCPP_DEBUG(this->get_logger(), "Image %s saved!", image_path.c_str());
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 10000, "Saved %d images", saved_image_count_);
+            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Saved %d images", saved_image_count_);
 
             saved_image_count_ += 1;
             std_msgs::msg::UInt64 msg;
